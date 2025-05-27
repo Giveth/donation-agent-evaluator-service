@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import { ErrorResponseDto } from '../dto/error-response.dto';
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
@@ -45,12 +46,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       );
     }
 
-    const errorResponse = {
-      statusCode: status,
-      timestamp: new Date().toISOString(),
-      path: request.url,
-      message,
-    };
+    const errorResponse = new ErrorResponseDto(status, message, request.url);
 
     // Log the error response
     this.logger.error(

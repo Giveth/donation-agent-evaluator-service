@@ -74,4 +74,13 @@ export default tseslint.config(
       'no-console': 'off',
     },
   },
+  {
+    files: ['**/*.dto.ts'],
+    rules: {
+      // Relax unsafe call warnings for DTO files since decorators are commonly used
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+    },
+  },
 );

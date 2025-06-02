@@ -393,9 +393,16 @@ export class TwitterService {
         if (tweet.timeParsed && tweet.timeParsed >= cutoffDate) {
           tweets.push(tweet);
         } else if (tweet.timeParsed && tweet.timeParsed < cutoffDate) {
-          // Since tweets are generally returned in reverse chronological order,
-          // we can break if we encounter an old tweet
-          break;
+          // Skip old tweets but don't break immediately as pinned tweets might be old
+          // but recent tweets could still exist after them
+          this.logger.debug(
+            `${cleanHandle} - Tweet ${tweet.id} is older than 90 days, skipping`,
+          );
+          // Note: Not breaking here to handle pinned tweets correctly
+        } else {
+          this.logger.debug(
+            `${cleanHandle} - Tweet ${tweet.id} has no timeParsed or invalid date`,
+          );
         }
 
         count++;
@@ -644,12 +651,12 @@ export class TwitterService {
         const cacheKey = `twitter_posts_${handle}`;
 
         // Check cache first
-        const cachedPosts =
-          await this.cacheManager.get<SocialPostDto[]>(cacheKey);
-        if (cachedPosts) {
-          this.logger.debug(`Returning cached Twitter posts for ${handle}`);
-          return cachedPosts;
-        }
+        // const cachedPosts =
+        //   await this.cacheManager.get<SocialPostDto[]>(cacheKey);
+        // if (cachedPosts) {
+        //   this.logger.debug(`Returning cached Twitter posts for ${handle}`);
+        //   return cachedPosts;
+        // }
 
         this.logger.debug(`Fetching fresh Twitter posts for ${handle}`);
 
@@ -658,25 +665,65 @@ export class TwitterService {
         const cutoffDate = new Date();
         cutoffDate.setDate(cutoffDate.getDate() - 90); // 90 days ago
 
+        this.logger.debug(
+          `Cutoff date for ${handle}: ${cutoffDate.toISOString()}`,
+        );
+
         // Get tweets from the user's timeline
         let count = 0;
-        for await (const tweet of this.scraper.getTweets(handle, 15)) {
-          // Stop if we have enough tweets or if tweet is too old
-          if (tweets.length >= 10) {
-            break;
+        let iteratorCount = 0;
+
+        try {
+          this.logger.debug(`Starting tweet iteration for ${handle}...`);
+
+          for await (const tweet of this.scraper.getTweets(handle, 15)) {
+            iteratorCount++;
+            this.logger.debug(
+              `${handle} - Tweet ${iteratorCount}: ${tweet.id}, ${tweet.timeParsed?.toISOString()}, text: "${tweet.text?.substring(0, 50)}..."`,
+            );
+
+            // Stop if we have enough tweets or if tweet is too old
+            if (tweets.length >= 10) {
+              this.logger.debug(`${handle} - Reached 10 tweets limit`);
+              break;
+            }
+
+            // Filter tweets from last 90 days
+            if (tweet.timeParsed && tweet.timeParsed >= cutoffDate) {
+              tweets.push(tweet);
+              this.logger.debug(
+                `${handle} - Added tweet ${tweet.id} (within 90 days)`,
+              );
+            } else if (tweet.timeParsed && tweet.timeParsed < cutoffDate) {
+              // Skip old tweets but don't break immediately as pinned tweets might be old
+              // but recent tweets could still exist after them
+              this.logger.debug(
+                `${handle} - Tweet ${tweet.id} is older than 90 days, skipping`,
+              );
+              // Note: Not breaking here to handle pinned tweets correctly
+            } else {
+              this.logger.debug(
+                `${handle} - Tweet ${tweet.id} has no timeParsed or invalid date`,
+              );
+            }
+
+            count++;
+            if (count >= 15) {
+              this.logger.debug(
+                `${handle} - Reached safety limit of 15 iterations`,
+              );
+              break;
+            }
           }
 
-          // Filter tweets from last 90 days
-          if (tweet.timeParsed && tweet.timeParsed >= cutoffDate) {
-            tweets.push(tweet);
-          } else if (tweet.timeParsed && tweet.timeParsed < cutoffDate) {
-            // Since tweets are generally returned in reverse chronological order,
-            // we can break if we encounter an old tweet
-            break;
-          }
-
-          count++;
-          if (count >= 15) break; // Safety limit
+          this.logger.debug(
+            `${handle} - Iterator finished. Total iterations: ${iteratorCount}, Valid tweets found: ${tweets.length}`,
+          );
+        } catch (iteratorError) {
+          this.logger.error(
+            `${handle} - Error during tweet iteration: ${iteratorError.message}`,
+          );
+          throw iteratorError;
         }
 
         // Map to SocialPostDto

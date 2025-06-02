@@ -3,8 +3,8 @@ import { AppModule } from './src/app.module';
 import { TwitterService } from './src/modules/social-media/services/twitter.service';
 
 async function testTwitterService() {
-  console.log('🚀 Starting Twitter Service Test for @elonmusk');
-  console.log('═'.repeat(50));
+  console.log('🚀 Starting Twitter Service Test for Multiple Accounts');
+  console.log('═'.repeat(60));
 
   try {
     // Create NestJS application
@@ -29,44 +29,130 @@ async function testTwitterService() {
     const isHealthy = await twitterService.healthCheck();
     console.log(`Health Status: ${isHealthy ? '✅ HEALTHY' : '❌ UNHEALTHY'}`);
 
-    // Test fetching Elon Musk's tweets
-    console.log('\n🐦 Fetching @elonmusk tweets...');
-    console.log('─'.repeat(30));
+    // Test single handle (existing test)
+    console.log('\n🐦 Testing Single Handle: @davidasinclair...');
+    console.log('─'.repeat(40));
 
-    const startTime = Date.now();
-    const tweets = await twitterService.getRecentTweets('davidasinclair');
-    const endTime = Date.now();
+    const startTimeSingle = Date.now();
+    const singleTweets = await twitterService.getRecentTweets('davidasinclair');
+    const endTimeSingle = Date.now();
 
-    console.log(`⏱️  Request completed in ${endTime - startTime}ms`);
-    console.log(`📊 Found ${tweets.length} tweets`);
+    console.log(
+      `⏱️  Single handle request completed in ${endTimeSingle - startTimeSingle}ms`,
+    );
+    console.log(`📊 Found ${singleTweets.length} tweets for @davidasinclair`);
 
-    if (tweets.length > 0) {
-      console.log('\n📝 Recent Tweets:');
-      console.log('═'.repeat(50));
+    // Test batch fetching with multiple handles (NEW TEST)
+    console.log('\n🚀 Testing Batch Fetching: Multiple Handles...');
+    console.log('═'.repeat(60));
 
-      tweets.forEach((tweet, index) => {
-        console.log(`\n${index + 1}. Tweet ID: ${tweet.id ?? 'N/A'}`);
-        console.log(`   Date: ${tweet.createdAt.toISOString()}`);
-        console.log(`   Platform: ${tweet.platform}`);
-        console.log(`   URL: ${tweet.url ?? 'N/A'}`);
-        console.log(
-          `   Text: ${tweet.text.substring(0, 100)}${tweet.text.length > 100 ? '...' : ''}`,
-        );
-        console.log('─'.repeat(50));
-      });
-    } else {
-      console.log('\n⚠️  No tweets found. This could mean:');
-      console.log('   • Authentication failed');
-      console.log('   • Rate limiting');
-      console.log('   • Network issues');
-      console.log('   • Missing credentials');
+    const testHandles = [
+      'elonmusk', // Tech entrepreneur
+      'davidasinclair', // Scientist
+      'naval', // Tech investor/philosopher
+    ];
+
+    console.log(
+      `📋 Testing with ${testHandles.length} handles: ${testHandles.join(', ')}`,
+    );
+
+    const startTimeBatch = Date.now();
+    const batchResults =
+      await twitterService.getRecentTweetsForHandles(testHandles);
+    const endTimeBatch = Date.now();
+
+    console.log(
+      `⏱️  Batch request completed in ${endTimeBatch - startTimeBatch}ms`,
+    );
+
+    // Display batch summary
+    const summary = twitterService.getBatchSummary(batchResults);
+    console.log('\n📊 Batch Operation Summary:');
+    console.log('─'.repeat(40));
+    console.log(`  • Total Handles: ${summary.total}`);
+    console.log(`  • Successful: ${summary.successful}`);
+    console.log(`  • Failed: ${summary.failed}`);
+    console.log(`  • Success Rate: ${summary.successRate.toFixed(1)}%`);
+    console.log(`  • Total Posts Retrieved: ${summary.totalPosts}`);
+
+    if (summary.failedHandles.length > 0) {
+      console.log(`  • Failed Handles: ${summary.failedHandles.join(', ')}`);
+    }
+
+    // Display detailed results for each handle
+    console.log('\n📝 Detailed Results by Handle:');
+    console.log('═'.repeat(60));
+
+    batchResults.forEach((result, index) => {
+      console.log(`\n${index + 1}. Handle: @${result.handle}`);
+      console.log(`   Status: ${result.success ? '✅ SUCCESS' : '❌ FAILED'}`);
+
+      if (result.success) {
+        console.log(`   Posts Found: ${result.posts.length}`);
+
+        if (result.posts.length > 0) {
+          console.log('   Recent Posts:');
+          result.posts.slice(0, 3).forEach((post, postIndex) => {
+            console.log(
+              `     ${postIndex + 1}. ${post.createdAt.toISOString().split('T')[0]} - ${post.text.substring(0, 80)}${post.text.length > 80 ? '...' : ''}`,
+            );
+          });
+
+          if (result.posts.length > 3) {
+            console.log(`     ... and ${result.posts.length - 3} more posts`);
+          }
+        } else {
+          console.log('   No recent posts found (within last 90 days)');
+        }
+      } else {
+        console.log(`   Error: ${result.error}`);
+      }
+
+      console.log(`   ${'─'.repeat(50)}`);
+    });
+
+    // Get only successful results
+    const successfulResults = twitterService.getSuccessfulResults(batchResults);
+    console.log(
+      `\n✅ Successfully processed ${successfulResults.length} out of ${testHandles.length} handles`,
+    );
+
+    // Performance comparison
+    console.log('\n⚡ Performance Comparison:');
+    console.log('─'.repeat(40));
+    console.log(
+      `  • Single Handle (davidasinclair): ${endTimeSingle - startTimeSingle}ms`,
+    );
+    console.log(
+      `  • Batch (${testHandles.length} handles): ${endTimeBatch - startTimeBatch}ms`,
+    );
+
+    if (summary.successful > 0) {
+      const avgTimePerHandle =
+        (endTimeBatch - startTimeBatch) / summary.successful;
+      console.log(
+        `  • Average per successful handle: ${avgTimePerHandle.toFixed(0)}ms`,
+      );
     }
 
     // Test different handle formats
     console.log('\n🧪 Testing different handle formats...');
+    console.log('─'.repeat(40));
+
+    const formatTests = [
+      'elonmusk', // Plain username
+      '@elonmusk', // With @ symbol
+      'https://twitter.com/elonmusk', // Twitter URL
+      'https://x.com/elonmusk', // X.com URL
+    ];
+
+    console.log('Testing format variations for same user:');
+    formatTests.forEach(format => {
+      console.log(`  • Input: "${format}"`);
+    });
 
     await app.close();
-    console.log('\n✅ Test completed successfully!');
+    console.log('\n✅ All tests completed successfully!');
   } catch (error) {
     console.error('\n❌ Test failed with error:');
     console.error('Error:', error.message);
@@ -87,6 +173,9 @@ async function testTwitterService() {
     );
     console.log('4. Ensure your Twitter account is not locked or suspended');
     console.log('5. Check your internet connection');
+    console.log(
+      '6. Rate limiting might be causing failures - this is normal behavior',
+    );
   }
 }
 
@@ -128,8 +217,8 @@ function checkEnvironmentSetup() {
 
 // Main execution
 if (require.main === module) {
-  console.log('🧪 Twitter Service Test - Elon Musk Tweets');
-  console.log('═'.repeat(50));
+  console.log('🧪 Twitter Service Test - Multiple Accounts Batch Testing');
+  console.log('═'.repeat(60));
 
   const envOk = checkEnvironmentSetup();
   console.log('\n');

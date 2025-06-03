@@ -110,30 +110,50 @@ export class TwitterService {
 
   /**
    * Performs the actual authentication with Twitter.
-   * Uses a dual strategy: cookies first, then password fallback.
+   * Uses a dual strategy: cookies first, then password fallback for expired cookies.
    */
   private async performAuthentication(): Promise<void> {
     try {
-      // Try cookie authentication first
-      const cookieSuccess = await this.authenticateWithCookies();
-      if (cookieSuccess) {
-        this.isAuthenticated = true;
-        this.logger.log('✅ Twitter authentication successful (cookies)');
-        return;
+      // Check if cookies are available first
+      const cookiesEnv = this.configService.get<string>('TWITTER_COOKIES');
+      const cookiesFileExists = fs.existsSync(this.cookiesFilePath);
+
+      if (cookiesEnv || cookiesFileExists) {
+        this.logger.log(
+          '🍪 Cookies available, attempting cookie authentication...',
+        );
+        const cookieSuccess = await this.authenticateWithCookies();
+        if (cookieSuccess) {
+          this.isAuthenticated = true;
+          this.logger.log('✅ Twitter authentication successful (cookies)');
+          return;
+        } else {
+          this.logger.warn(
+            '⚠️ Cookie authentication failed (expired/invalid). Falling back to password authentication...',
+          );
+          // Continue to password authentication below
+        }
+      } else {
+        this.logger.log(
+          '🔐 No cookies available, attempting password authentication...',
+        );
       }
 
-      // Fallback to password authentication
+      // Try password authentication (either no cookies available or cookies failed)
       const passwordSuccess = await this.authenticateWithPassword();
       if (passwordSuccess) {
         this.isAuthenticated = true;
         this.logger.log('✅ Twitter authentication successful (password)');
+
+        // Save new cookies after successful password authentication
         const cookies = await this.scraper.getCookies();
-        console.log('cookiespwd', cookies);
+        this.saveCookiesToFile(cookies);
+        this.logger.log('💾 Saved fresh authentication cookies for future use');
         return;
       }
 
       this.logger.warn(
-        '⚠️ Twitter authentication failed. Service will return empty arrays for tweet requests.',
+        '⚠️ All Twitter authentication methods failed. Service will return empty arrays for tweet requests.',
       );
     } catch (error) {
       this.logger.error(

@@ -115,10 +115,9 @@ export class TwitterService {
   private async performAuthentication(): Promise<void> {
     try {
       // Check if cookies are available first
-      const cookiesEnv = this.configService.get<string>('TWITTER_COOKIES');
       const cookiesFileExists = fs.existsSync(this.cookiesFilePath);
 
-      if (cookiesEnv || cookiesFileExists) {
+      if (cookiesFileExists) {
         this.logger.log(
           '🍪 Cookies available, attempting cookie authentication...',
         );
@@ -173,25 +172,8 @@ export class TwitterService {
 
       let cookiesData: any[] | null = null;
 
-      // Method 1: Load from environment variable
-      const cookiesEnv = this.configService.get<string>('TWITTER_COOKIES');
-      this.logger.log('cookiesEnv', cookiesEnv);
-
-      if (cookiesEnv) {
-        try {
-          cookiesData = JSON.parse(cookiesEnv);
-          this.logger.log(
-            '✓ Loaded cookies from TWITTER_COOKIES environment variable',
-          );
-        } catch {
-          this.logger.warn(
-            '⚠️ Failed to parse TWITTER_COOKIES environment variable',
-          );
-        }
-      }
-
-      // Method 2: Load from file
-      if (!cookiesData && fs.existsSync(this.cookiesFilePath)) {
+      // Load from file
+      if (fs.existsSync(this.cookiesFilePath)) {
         try {
           const fileContent = fs.readFileSync(this.cookiesFilePath, 'utf8');
           cookiesData = JSON.parse(fileContent);
@@ -214,9 +196,11 @@ export class TwitterService {
         return false;
       }
 
-      // Check for essential cookies
-      const hasAuthToken = cookiesData.some(c => c.name === 'auth_token');
-      const hasCt0 = cookiesData.some(c => c.name === 'ct0');
+      // Check for essential cookies - handle both 'name' and 'key' fields
+      const hasAuthToken = cookiesData.some(
+        c => (c.name ?? c.key) === 'auth_token',
+      );
+      const hasCt0 = cookiesData.some(c => (c.name ?? c.key) === 'ct0');
 
       this.logger.log(
         `📋 Cookie check: auth_token=${hasAuthToken ? '✓' : '❌'}, ct0=${hasCt0 ? '✓' : '❌'}`,
@@ -233,16 +217,35 @@ export class TwitterService {
       const formattedCookies = cookiesData
         .map(cookie => {
           try {
+            // Normalize cookie format - handle both 'name'/'key' and 'value' fields
+            const normalizedCookie = {
+              ...cookie,
+              name: cookie.name ?? cookie.key,
+              value: cookie.value,
+            };
+
             // Use tough-cookie's Cookie.fromJSON to create proper Cookie objects
-            const cookieObj = Cookie.fromJSON(cookie);
+            const cookieObj = Cookie.fromJSON(normalizedCookie);
 
             // Fix domain compatibility between x.com and twitter.com
             if (cookieObj?.domain) {
-              if (cookieObj.domain === '.x.com') {
-                // Create a copy with twitter.com domain for compatibility
+              // Handle all domain variations
+              if (
+                cookieObj.domain === '.x.com' ||
+                cookieObj.domain === 'x.com'
+              ) {
+                // Create cookies for both domains to ensure compatibility
                 const twitterCookie = cookieObj.clone();
                 twitterCookie.domain = '.twitter.com';
-                return twitterCookie;
+                return [cookieObj, twitterCookie];
+              } else if (
+                cookieObj.domain === '.twitter.com' ||
+                cookieObj.domain === 'twitter.com'
+              ) {
+                // Create cookies for both domains to ensure compatibility
+                const xCookie = cookieObj.clone();
+                xCookie.domain = '.x.com';
+                return [cookieObj, xCookie];
               }
             }
 
@@ -254,6 +257,7 @@ export class TwitterService {
             return null;
           }
         })
+        .flat() // Flatten the array since we might return arrays of cookies
         .filter(cookie => cookie !== null);
 
       if (formattedCookies.length === 0) {

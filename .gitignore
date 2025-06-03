@@ -54,6 +54,7 @@ pids
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
-/docs
+# /docs
 /docs_old
 /rules
+.twitter_cookies.json

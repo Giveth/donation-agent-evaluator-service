@@ -212,6 +212,27 @@ export class TwitterService {
         );
       }
 
+      // Try setting cookies directly without conversion first
+      try {
+        await this.scraper.setCookies(cookiesData);
+        this.logger.log('📋 Set cookies directly from saved format');
+
+        // Verify authentication
+        const isLoggedIn = await this.scraper.isLoggedIn();
+        if (isLoggedIn) {
+          this.logger.log('✅ Direct cookie authentication successful');
+          return true;
+        } else {
+          this.logger.debug(
+            '⚪ Direct cookie format failed, trying conversion...',
+          );
+        }
+      } catch (error) {
+        this.logger.debug(
+          `⚪ Direct cookie setting failed: ${error.message}, trying conversion...`,
+        );
+      }
+
       // Convert plain objects to proper Cookie format expected by setCookies
       // The setCookies method expects Cookie objects from the tough-cookie library
       const formattedCookies = cookiesData
@@ -224,28 +245,29 @@ export class TwitterService {
               value: cookie.value,
             };
 
+            // Remove the 'key' field if it exists to avoid confusion
+            if (normalizedCookie.key && normalizedCookie.name) {
+              delete normalizedCookie.key;
+            }
+
             // Use tough-cookie's Cookie.fromJSON to create proper Cookie objects
             const cookieObj = Cookie.fromJSON(normalizedCookie);
 
-            // Fix domain compatibility between x.com and twitter.com
+            // Fix domain compatibility - convert all domains to x.com since that's what the scraper uses
             if (cookieObj?.domain) {
-              // Handle all domain variations
+              // Convert all twitter.com domains to x.com domains
               if (
-                cookieObj.domain === '.x.com' ||
-                cookieObj.domain === 'x.com'
-              ) {
-                // Create cookies for both domains to ensure compatibility
-                const twitterCookie = cookieObj.clone();
-                twitterCookie.domain = '.twitter.com';
-                return [cookieObj, twitterCookie];
-              } else if (
                 cookieObj.domain === '.twitter.com' ||
                 cookieObj.domain === 'twitter.com'
               ) {
-                // Create cookies for both domains to ensure compatibility
-                const xCookie = cookieObj.clone();
-                xCookie.domain = '.x.com';
-                return [cookieObj, xCookie];
+                cookieObj.domain = cookieObj.domain.replace(
+                  'twitter.com',
+                  'x.com',
+                );
+              }
+              // Ensure x.com domains are properly formatted
+              else if (cookieObj.domain === 'x.com') {
+                cookieObj.domain = '.x.com';
               }
             }
 
@@ -268,7 +290,7 @@ export class TwitterService {
       this.logger.log(
         `📋 Formatted ${formattedCookies.length} cookies for authentication`,
       );
-      this.logger.log('formattedCookies', formattedCookies);
+      // Removed verbose cookie logging for production
       // Set cookies using the properly formatted Cookie objects
       await this.scraper.setCookies(formattedCookies);
 
@@ -277,7 +299,7 @@ export class TwitterService {
       if (isLoggedIn) {
         // Save current cookies for future use (they might be updated)
         const currentCookies = await this.scraper.getCookies();
-        console.log('currentCookies', currentCookies);
+        // Removed verbose cookie logging for production
         this.saveCookiesToFile(currentCookies);
         return true;
       } else {
@@ -298,7 +320,7 @@ export class TwitterService {
       const username = this.configService.get<string>('TWITTER_USERNAME');
       const password = this.configService.get<string>('TWITTER_PASSWORD');
       const email = this.configService.get<string>('TWITTER_EMAIL');
-      this.logger.log('username', username);
+      // Username logging removed for security
       if (!username || !password || !email) {
         this.logger.warn(
           '⚠️ Twitter credentials not provided. Please set TWITTER_USERNAME, TWITTER_PASSWORD, and TWITTER_EMAIL environment variables.',
@@ -312,7 +334,7 @@ export class TwitterService {
 
       // Save cookies after successful login
       const cookies = await this.scraper.getCookies();
-      console.log('cookies', cookies);
+      // Removed verbose cookie logging for production
       this.saveCookiesToFile(cookies);
       this.logger.log('💾 Saved authentication cookies for future use');
 

@@ -57,4 +57,4 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 # /docs
 /docs_old
 /rules
-.twitter_cookies.json
+twitter_cookies.json

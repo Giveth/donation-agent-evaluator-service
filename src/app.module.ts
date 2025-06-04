@@ -9,6 +9,7 @@ import { AppService } from './app.service';
 import { ConfigModule } from './core/config/config.module';
 import { CacheModule } from './core/cache/cache.module';
 import { SocialMediaModule } from './modules/social-media/social-media.module';
+import { SocialMediaStorageModule } from './modules/social-media-storage/social-media-storage.module';
 
 @Module({
   imports: [
@@ -109,6 +110,7 @@ import { SocialMediaModule } from './modules/social-media/social-media.module';
       }),
     }),
     SocialMediaModule,
+    SocialMediaStorageModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -265,4 +265,271 @@ export class SocialPostStorageService {
       ? (projectAccount.latestTwitterPostTimestamp ?? null)
       : (projectAccount.latestFarcasterPostTimestamp ?? null);
   }
+
+  /**
+   * Enhanced storage method that checks for duplicates by both ID and timestamp.
+   * This method stops processing if it encounters a post with a timestamp that already exists.
+   *
+   * @param projectId - The project ID to store posts for
+   * @param socialPosts - Array of social posts to store
+   * @returns Promise<{ stored: number; duplicatesFound: boolean; stoppedAtTimestamp?: Date }>
+   */
+  async storeSocialPostsIncremental(
+    projectId: string,
+    socialPosts: SocialPostDto[],
+  ): Promise<{
+    stored: number;
+    duplicatesFound: boolean;
+    stoppedAtTimestamp?: Date;
+  }> {
+    if (socialPosts.length === 0) {
+      this.logger.debug(`No social posts to store for project ${projectId}`);
+      return { stored: 0, duplicatesFound: false };
+    }
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // Get or create project social account
+      let projectAccount = await queryRunner.manager.findOne(
+        ProjectSocialAccount,
+        {
+          where: { projectId },
+        },
+      );
+
+      if (!projectAccount) {
+        projectAccount = queryRunner.manager.create(ProjectSocialAccount, {
+          projectId,
+        });
+        await queryRunner.manager.save(projectAccount);
+      }
+
+      // Sort posts by timestamp (newest first) to process them in chronological order
+      const sortedPosts = [...socialPosts].sort(
+        (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+      );
+
+      const postsToStore: SocialPostDto[] = [];
+      let duplicatesFound = false;
+      let stoppedAtTimestamp: Date | undefined;
+
+      // Check each post for duplicates by timestamp
+      for (const post of sortedPosts) {
+        if (isNaN(post.createdAt.getTime())) {
+          this.logger.debug(`Skipping post ${post.id} - invalid timestamp`);
+          continue;
+        }
+
+        // Check if a post with this timestamp already exists for this project and platform
+        const existingPost = await queryRunner.manager.findOne(
+          StoredSocialPost,
+          {
+            where: {
+              projectAccountId: projectAccount.id,
+              postTimestamp: post.createdAt,
+              metadata: { platform: post.platform },
+            },
+          },
+        );
+
+        if (existingPost) {
+          this.logger.log(
+            `Found duplicate timestamp for project ${projectId} at ${post.createdAt.toISOString()} - stopping incremental storage`,
+          );
+          duplicatesFound = true;
+          stoppedAtTimestamp = post.createdAt;
+          break;
+        }
+
+        // Also check by post ID for additional safety
+        if (post.id) {
+          const existingById = await queryRunner.manager.findOne(
+            StoredSocialPost,
+            {
+              where: {
+                projectAccountId: projectAccount.id,
+                postId: post.id,
+              },
+            },
+          );
+
+          if (existingById) {
+            this.logger.debug(`Post ${post.id} already exists by ID, skipping`);
+            continue;
+          }
+        }
+
+        postsToStore.push(post);
+      }
+
+      if (postsToStore.length === 0) {
+        this.logger.debug(
+          `No new social posts to store for project ${projectId}`,
+        );
+        await queryRunner.commitTransaction();
+        return { stored: 0, duplicatesFound, stoppedAtTimestamp };
+      }
+
+      // Store new social posts
+      const storedPosts = postsToStore.map(post =>
+        queryRunner.manager.create(StoredSocialPost, {
+          postId: post.id ?? `${Date.now()}-${Math.random()}`,
+          content: post.text,
+          url: post.url,
+          postTimestamp: post.createdAt,
+          fetchedAt: new Date(),
+          projectAccountId: projectAccount.id,
+          metadata: {
+            platform: post.platform,
+          },
+        }),
+      );
+
+      await queryRunner.manager.save(StoredSocialPost, storedPosts);
+
+      // Update project account's latest post timestamp based on platform
+      const latestPost = postsToStore.reduce((latest, current) =>
+        current.createdAt > latest.createdAt ? current : latest,
+      );
+
+      const { platform } = latestPost;
+      if (platform === 'twitter') {
+        if (
+          !projectAccount.latestTwitterPostTimestamp ||
+          latestPost.createdAt > projectAccount.latestTwitterPostTimestamp
+        ) {
+          projectAccount.latestTwitterPostTimestamp = latestPost.createdAt;
+          projectAccount.lastTwitterFetch = new Date();
+        }
+      } else {
+        if (
+          !projectAccount.latestFarcasterPostTimestamp ||
+          latestPost.createdAt > projectAccount.latestFarcasterPostTimestamp
+        ) {
+          projectAccount.latestFarcasterPostTimestamp = latestPost.createdAt;
+          projectAccount.lastFarcasterFetch = new Date();
+        }
+      }
+
+      await queryRunner.manager.save(projectAccount);
+      await queryRunner.commitTransaction();
+
+      this.logger.log(
+        `Stored ${storedPosts.length} new social posts for project ${projectId}${
+          duplicatesFound
+            ? ` (stopped at duplicate timestamp: ${stoppedAtTimestamp?.toISOString()})`
+            : ''
+        }`,
+      );
+
+      // Clean up old posts after successful storage
+      await this.cleanupOldSocialPosts(projectId);
+
+      return {
+        stored: storedPosts.length,
+        duplicatesFound,
+        stoppedAtTimestamp,
+      };
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      this.logger.error(
+        `Failed to store social posts for project ${projectId}:`,
+        error,
+      );
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  /**
+   * Get the latest post timestamp for a project and platform to use for incremental fetching
+   *
+   * @param projectId - The project ID
+   * @param platform - The social media platform
+   * @returns Promise<Date | null> - The latest post timestamp or null if no posts exist
+   */
+  async getLatestPostTimestamp(
+    projectId: string,
+    platform: 'twitter' | 'farcaster',
+  ): Promise<Date | null> {
+    const projectAccount = await this.projectAccountRepository.findOne({
+      where: { projectId },
+    });
+
+    if (!projectAccount) {
+      return null;
+    }
+
+    // Get the latest post timestamp from the database
+    const latestPost = await this.storedSocialPostRepository
+      .createQueryBuilder('post')
+      .where('post.projectAccountId = :projectAccountId', {
+        projectAccountId: projectAccount.id,
+      })
+      .andWhere("post.metadata->>'platform' = :platform", { platform })
+      .orderBy('post.postTimestamp', 'DESC')
+      .limit(1)
+      .getOne();
+
+    return latestPost?.postTimestamp ?? null;
+  }
+
+  /**
+   * Get accounts data for incremental batch processing
+   *
+   * @param platform - The platform to get accounts for
+   * @returns Promise<Array<{ projectId: string; handle: string; sinceTimestamp?: Date }>>
+   */
+  async getAccountsForIncrementalFetch(
+    platform: 'twitter' | 'farcaster',
+  ): Promise<
+    Array<{ projectId: string; handle: string; sinceTimestamp?: Date }>
+  > {
+    try {
+      const accounts = await this.projectAccountRepository
+        .createQueryBuilder('account')
+        .where(
+          platform === 'twitter'
+            ? "account.twitterHandle IS NOT NULL AND account.twitterHandle != ''"
+            : "account.farcasterUsername IS NOT NULL AND account.farcasterUsername != ''",
+        )
+        .getMany();
+
+      const result: Array<{
+        projectId: string;
+        handle: string;
+        sinceTimestamp?: Date;
+      }> = [];
+
+      for (const account of accounts) {
+        const handle =
+          platform === 'twitter'
+            ? account.twitterHandle
+            : account.farcasterUsername;
+
+        if (!handle) continue;
+
+        // Get the latest post timestamp for this account
+        const sinceTimestamp = await this.getLatestPostTimestamp(
+          account.projectId,
+          platform,
+        );
+
+        result.push({
+          projectId: account.projectId,
+          handle,
+          sinceTimestamp: sinceTimestamp ?? undefined,
+        });
+      }
+
+      return result;
+    } catch (error) {
+      this.logger.error(`Failed to get accounts for incremental fetch:`, error);
+      throw error;
+    }
+  }
 }

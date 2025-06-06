@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Scraper, Tweet } from '@the-convocation/twitter-scraper';
-import { SocialPostDto } from '../dto/social-post.dto';
+import { SocialPostDto, SocialMediaPlatform } from '../dto/social-post.dto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { Cookie } from 'tough-cookie';
@@ -526,7 +526,7 @@ export class TwitterService {
       id: tweet.id ?? undefined,
       text: tweet.text ?? '',
       createdAt: tweet.timeParsed ?? new Date(),
-      platform: 'twitter',
+      platform: SocialMediaPlatform.TWITTER,
       url: tweet.permanentUrl ?? undefined,
     });
   }

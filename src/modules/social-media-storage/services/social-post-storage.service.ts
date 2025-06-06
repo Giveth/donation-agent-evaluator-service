@@ -4,7 +4,10 @@ import { Repository, DataSource } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { StoredSocialPost } from '../entities/stored-social-post.entity';
 import { ProjectSocialAccount } from '../entities/project-social-account.entity';
-import { SocialPostDto } from '../../social-media/dto/social-post.dto';
+import {
+  SocialPostDto,
+  SocialMediaPlatform,
+} from '../../social-media/dto/social-post.dto';
 
 @Injectable()
 export class SocialPostStorageService {
@@ -96,7 +99,7 @@ export class SocialPostStorageService {
       );
 
       const { platform } = latestPost;
-      if (platform === 'twitter') {
+      if (platform === SocialMediaPlatform.TWITTER) {
         if (
           !projectAccount.latestTwitterPostTimestamp ||
           latestPost.createdAt > projectAccount.latestTwitterPostTimestamp
@@ -138,7 +141,7 @@ export class SocialPostStorageService {
   async getRecentSocialPosts(
     projectId: string,
     limit: number = 10,
-    platform?: 'twitter' | 'farcaster',
+    platform?: SocialMediaPlatform,
   ): Promise<SocialPostDto[]> {
     const projectAccount = await this.projectAccountRepository.findOne({
       where: { projectId },
@@ -179,7 +182,7 @@ export class SocialPostStorageService {
       id: post.postId,
       text: post.content,
       createdAt: post.postTimestamp,
-      platform: post.metadata?.platform as 'twitter' | 'farcaster',
+      platform: post.metadata?.platform as SocialMediaPlatform,
       url: post.url,
     }));
   }
@@ -250,7 +253,7 @@ export class SocialPostStorageService {
 
   async getProjectLastFetchTimestamp(
     projectId: string,
-    platform: 'twitter' | 'farcaster',
+    platform: SocialMediaPlatform,
   ): Promise<Date | null> {
     const projectAccount = await this.projectAccountRepository.findOne({
       where: { projectId },
@@ -261,7 +264,7 @@ export class SocialPostStorageService {
       return null;
     }
 
-    return platform === 'twitter'
+    return platform === SocialMediaPlatform.TWITTER
       ? (projectAccount.latestTwitterPostTimestamp ?? null)
       : (projectAccount.latestFarcasterPostTimestamp ?? null);
   }
@@ -396,7 +399,7 @@ export class SocialPostStorageService {
       );
 
       const { platform } = latestPost;
-      if (platform === 'twitter') {
+      if (platform === SocialMediaPlatform.TWITTER) {
         if (
           !projectAccount.latestTwitterPostTimestamp ||
           latestPost.createdAt > projectAccount.latestTwitterPostTimestamp
@@ -454,7 +457,7 @@ export class SocialPostStorageService {
    */
   async getLatestPostTimestamp(
     projectId: string,
-    platform: 'twitter' | 'farcaster',
+    platform: SocialMediaPlatform,
   ): Promise<Date | null> {
     const projectAccount = await this.projectAccountRepository.findOne({
       where: { projectId },
@@ -485,7 +488,7 @@ export class SocialPostStorageService {
    * @returns Promise<Array<{ projectId: string; handle: string; sinceTimestamp?: Date }>>
    */
   async getAccountsForIncrementalFetch(
-    platform: 'twitter' | 'farcaster',
+    platform: SocialMediaPlatform,
   ): Promise<
     Array<{ projectId: string; handle: string; sinceTimestamp?: Date }>
   > {
@@ -493,7 +496,7 @@ export class SocialPostStorageService {
       const accounts = await this.projectAccountRepository
         .createQueryBuilder('account')
         .where(
-          platform === 'twitter'
+          platform === SocialMediaPlatform.TWITTER
             ? "account.twitterHandle IS NOT NULL AND account.twitterHandle != ''"
             : "account.farcasterUsername IS NOT NULL AND account.farcasterUsername != ''",
         )
@@ -507,7 +510,7 @@ export class SocialPostStorageService {
 
       for (const account of accounts) {
         const handle =
-          platform === 'twitter'
+          platform === SocialMediaPlatform.TWITTER
             ? account.twitterHandle
             : account.farcasterUsername;
 

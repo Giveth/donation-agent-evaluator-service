@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ProjectSocialAccount } from '../entities/project-social-account.entity';
+import { SocialMediaPlatform } from '../../social-media/dto/social-post.dto';
 
 export interface ProjectAccountData {
   twitterHandle?: string;
@@ -127,7 +128,7 @@ export class ProjectSocialAccountService {
 
   async updateLastFetchTimestamp(
     projectId: string,
-    platform: 'twitter' | 'farcaster',
+    platform: SocialMediaPlatform,
   ): Promise<void> {
     try {
       const projectAccount = await this.projectAccountRepository.findOne({
@@ -142,7 +143,7 @@ export class ProjectSocialAccountService {
       }
 
       const now = new Date();
-      if (platform === 'twitter') {
+      if (platform === SocialMediaPlatform.TWITTER) {
         projectAccount.lastTwitterFetch = now;
       } else {
         projectAccount.lastFarcasterFetch = now;
@@ -162,7 +163,7 @@ export class ProjectSocialAccountService {
   }
 
   async getStaleProjects(
-    platform: 'twitter' | 'farcaster',
+    platform: SocialMediaPlatform,
     maxAgeMinutes: number = 60,
   ): Promise<ProjectSocialAccount[]> {
     try {
@@ -172,7 +173,7 @@ export class ProjectSocialAccountService {
       const queryBuilder =
         this.projectAccountRepository.createQueryBuilder('account');
 
-      if (platform === 'twitter') {
+      if (platform === SocialMediaPlatform.TWITTER) {
         queryBuilder
           .where(
             "account.twitterHandle IS NOT NULL AND account.twitterHandle != ''",

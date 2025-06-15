@@ -4,6 +4,7 @@ import {
   ConfigService,
 } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigModule } from './core/config/config.module';
@@ -15,6 +16,7 @@ import { SocialMediaStorageModule } from './modules/social-media-storage/social-
   imports: [
     ConfigModule,
     CacheModule,
+    ScheduleModule.forRoot(),
     TypeOrmModule.forRootAsync({
       imports: [NestConfigModule],
       inject: [ConfigService],

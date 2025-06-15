@@ -1,9 +1,7 @@
-import { Injectable, Logger, Inject } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Cache } from 'cache-manager';
 import { Scraper, Tweet } from '@the-convocation/twitter-scraper';
-import { SocialPostDto } from '../dto/social-post.dto';
+import { SocialPostDto, SocialMediaPlatform } from '../dto/social-post.dto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { Cookie } from 'tough-cookie';
@@ -27,7 +25,7 @@ export interface HandleResult {
  * - Batch processing of multiple handles with `getRecentTweetsForHandles()`
  * - Automatic rate limiting to avoid detection/blocking
  * - Retry logic with exponential backoff
- * - Comprehensive caching support
+ * - Database-backed persistent storage
  * - Authentication state management
  *
  * ## Batch Processing Usage:
@@ -55,7 +53,6 @@ export interface HandleResult {
 export class TwitterService {
   private readonly logger = new Logger(TwitterService.name);
   private readonly scraper: Scraper;
-  private readonly cacheTtl: number;
   private readonly cookiesFilePath: string;
   private isAuthenticated = false;
   private authenticationPromise: Promise<void> | null = null;
@@ -67,16 +64,9 @@ export class TwitterService {
   private readonly baseRetryDelay: number;
   private lastRequestTime: number = 0;
 
-  constructor(
-    private readonly configService: ConfigService,
-    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
-  ) {
+  constructor(private readonly configService: ConfigService) {
     // Initialize the scraper
     this.scraper = new Scraper();
-
-    // Get cache TTL from config, default to 6 hours (21600 seconds)
-    this.cacheTtl =
-      this.configService.get<number>('CACHE_TTL_SOCIAL_MEDIA') ?? 21600;
 
     // Set up cookies file path
     this.cookiesFilePath = path.join(process.cwd(), 'twitter_cookies.json');
@@ -212,6 +202,27 @@ export class TwitterService {
         );
       }
 
+      // Try setting cookies directly without conversion first
+      try {
+        await this.scraper.setCookies(cookiesData);
+        this.logger.log('📋 Set cookies directly from saved format');
+
+        // Verify authentication
+        const isLoggedIn = await this.scraper.isLoggedIn();
+        if (isLoggedIn) {
+          this.logger.log('✅ Direct cookie authentication successful');
+          return true;
+        } else {
+          this.logger.debug(
+            '⚪ Direct cookie format failed, trying conversion...',
+          );
+        }
+      } catch (error) {
+        this.logger.debug(
+          `⚪ Direct cookie setting failed: ${error.message}, trying conversion...`,
+        );
+      }
+
       // Convert plain objects to proper Cookie format expected by setCookies
       // The setCookies method expects Cookie objects from the tough-cookie library
       const formattedCookies = cookiesData
@@ -224,28 +235,29 @@ export class TwitterService {
               value: cookie.value,
             };
 
+            // Remove the 'key' field if it exists to avoid confusion
+            if (normalizedCookie.key && normalizedCookie.name) {
+              delete normalizedCookie.key;
+            }
+
             // Use tough-cookie's Cookie.fromJSON to create proper Cookie objects
             const cookieObj = Cookie.fromJSON(normalizedCookie);
 
-            // Fix domain compatibility between x.com and twitter.com
+            // Fix domain compatibility - convert all domains to x.com since that's what the scraper uses
             if (cookieObj?.domain) {
-              // Handle all domain variations
+              // Convert all twitter.com domains to x.com domains
               if (
-                cookieObj.domain === '.x.com' ||
-                cookieObj.domain === 'x.com'
-              ) {
-                // Create cookies for both domains to ensure compatibility
-                const twitterCookie = cookieObj.clone();
-                twitterCookie.domain = '.twitter.com';
-                return [cookieObj, twitterCookie];
-              } else if (
                 cookieObj.domain === '.twitter.com' ||
                 cookieObj.domain === 'twitter.com'
               ) {
-                // Create cookies for both domains to ensure compatibility
-                const xCookie = cookieObj.clone();
-                xCookie.domain = '.x.com';
-                return [cookieObj, xCookie];
+                cookieObj.domain = cookieObj.domain.replace(
+                  'twitter.com',
+                  'x.com',
+                );
+              }
+              // Ensure x.com domains are properly formatted
+              else if (cookieObj.domain === 'x.com') {
+                cookieObj.domain = '.x.com';
               }
             }
 
@@ -268,7 +280,7 @@ export class TwitterService {
       this.logger.log(
         `📋 Formatted ${formattedCookies.length} cookies for authentication`,
       );
-      this.logger.log('formattedCookies', formattedCookies);
+      // Removed verbose cookie logging for production
       // Set cookies using the properly formatted Cookie objects
       await this.scraper.setCookies(formattedCookies);
 
@@ -277,7 +289,7 @@ export class TwitterService {
       if (isLoggedIn) {
         // Save current cookies for future use (they might be updated)
         const currentCookies = await this.scraper.getCookies();
-        console.log('currentCookies', currentCookies);
+        // Removed verbose cookie logging for production
         this.saveCookiesToFile(currentCookies);
         return true;
       } else {
@@ -298,7 +310,7 @@ export class TwitterService {
       const username = this.configService.get<string>('TWITTER_USERNAME');
       const password = this.configService.get<string>('TWITTER_PASSWORD');
       const email = this.configService.get<string>('TWITTER_EMAIL');
-      this.logger.log('username', username);
+      // Username logging removed for security
       if (!username || !password || !email) {
         this.logger.warn(
           '⚠️ Twitter credentials not provided. Please set TWITTER_USERNAME, TWITTER_PASSWORD, and TWITTER_EMAIL environment variables.',
@@ -312,7 +324,7 @@ export class TwitterService {
 
       // Save cookies after successful login
       const cookies = await this.scraper.getCookies();
-      console.log('cookies', cookies);
+      // Removed verbose cookie logging for production
       this.saveCookiesToFile(cookies);
       this.logger.log('💾 Saved authentication cookies for future use');
 
@@ -376,17 +388,8 @@ export class TwitterService {
 
     // Clean the handle - remove @ if present and extract username from URL if needed
     const cleanHandle = this.cleanTwitterHandle(twitterHandle);
-    const cacheKey = `twitter_posts_${cleanHandle}`;
 
     try {
-      // Check cache first
-      // const cachedPosts =
-      //   await this.cacheManager.get<SocialPostDto[]>(cacheKey);
-      // if (cachedPosts) {
-      //   this.logger.debug(`Returning cached Twitter posts for ${cleanHandle}`);
-      //   return cachedPosts;
-      // }
-
       // Ensure we're authenticated before making requests
       await this.ensureAuthenticated();
 
@@ -397,52 +400,7 @@ export class TwitterService {
         return [];
       }
 
-      this.logger.log(`Fetching fresh Twitter posts for ${cleanHandle}`);
-
-      // Fetch tweets using the scraper
-      const tweets: Tweet[] = [];
-      const cutoffDate = new Date();
-      cutoffDate.setDate(cutoffDate.getDate() - 90); // 90 days ago
-
-      // Get tweets from the user's timeline
-      let count = 0;
-      for await (const tweet of this.scraper.getTweets(cleanHandle, 15)) {
-        // Fetch up to 15 to have buffer for filtering
-        // Stop if we have enough tweets or if tweet is too old
-        if (tweets.length >= 10) {
-          break;
-        }
-
-        // Filter tweets from last 90 days
-        if (tweet.timeParsed && tweet.timeParsed >= cutoffDate) {
-          tweets.push(tweet);
-        } else if (tweet.timeParsed && tweet.timeParsed < cutoffDate) {
-          // Skip old tweets but don't break immediately as pinned tweets might be old
-          // but recent tweets could still exist after them
-          this.logger.debug(
-            `${cleanHandle} - Tweet ${tweet.id} is older than 90 days, skipping`,
-          );
-          // Note: Not breaking here to handle pinned tweets correctly
-        } else {
-          this.logger.debug(
-            `${cleanHandle} - Tweet ${tweet.id} has no timeParsed or invalid date`,
-          );
-        }
-
-        count++;
-        if (count >= 15) break; // Safety limit
-      }
-
-      // Map to SocialPostDto
-      const socialPosts = tweets.map(tweet => this.mapTweetToSocialPost(tweet));
-
-      // Cache the results
-      await this.cacheManager.set(cacheKey, socialPosts, this.cacheTtl * 1000); // Convert to milliseconds
-
-      this.logger.log(
-        `Successfully fetched ${socialPosts.length} tweets for ${cleanHandle}`,
-      );
-      return socialPosts;
+      return await this.getRecentTweetsInternal(cleanHandle);
     } catch (error) {
       this.logger.error(
         `Error fetching tweets for ${cleanHandle}: ${error.message}`,
@@ -453,6 +411,76 @@ export class TwitterService {
       // with a score of 0 for social media components
       return [];
     }
+  }
+
+  /**
+   * Internal method that fetches recent tweets for a clean handle.
+   * Used by both getRecentTweets and fetchTweetsWithRetry to avoid code duplication.
+   *
+   * @param cleanHandle - Already cleaned Twitter handle
+   * @returns Promise<SocialPostDto[]> - Array of recent tweets mapped to SocialPostDto
+   */
+  private async getRecentTweetsInternal(
+    cleanHandle: string,
+  ): Promise<SocialPostDto[]> {
+    this.logger.log(`Fetching fresh Twitter posts for ${cleanHandle}`);
+
+    // Fetch tweets using the scraper
+    const tweets: Tweet[] = [];
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - 90); // 90 days ago
+
+    // Get tweets from the user's timeline
+    let count = 0;
+    for await (const tweet of this.scraper.getTweets(cleanHandle, 15)) {
+      // Fetch up to 15 to have buffer for filtering
+      // Stop if we have enough tweets or if tweet is too old
+      if (tweets.length >= 10) {
+        break;
+      }
+
+      // Skip pinned tweets unless they meet our date criteria
+      // Pinned tweets can be old and break chronological order
+      if (tweet.isPin) {
+        // Only include pinned tweets if they're within our date range
+        if (tweet.timeParsed && tweet.timeParsed >= cutoffDate) {
+          this.logger.debug(
+            `${cleanHandle} - Including pinned tweet ${tweet.id} from ${tweet.timeParsed.toISOString()} (within date range)`,
+          );
+          tweets.push(tweet);
+        } else {
+          this.logger.debug(
+            `${cleanHandle} - Skipping pinned tweet ${tweet.id} (outside date range or no timestamp)`,
+          );
+        }
+        continue;
+      }
+
+      // Filter tweets from last 90 days
+      if (tweet.timeParsed && tweet.timeParsed >= cutoffDate) {
+        tweets.push(tweet);
+      } else if (tweet.timeParsed && tweet.timeParsed < cutoffDate) {
+        // Skip old tweets but don't break immediately as there might be more recent tweets
+        this.logger.debug(
+          `${cleanHandle} - Tweet ${tweet.id} is older than 90 days, skipping`,
+        );
+      } else {
+        this.logger.debug(
+          `${cleanHandle} - Tweet ${tweet.id} has no timeParsed or invalid date`,
+        );
+      }
+
+      count++;
+      if (count >= 15) break; // Safety limit
+    }
+
+    // Map to SocialPostDto
+    const socialPosts = tweets.map(tweet => this.mapTweetToSocialPost(tweet));
+
+    this.logger.log(
+      `Successfully fetched ${socialPosts.length} tweets for ${cleanHandle}`,
+    );
+    return socialPosts;
   }
 
   /**
@@ -498,7 +526,7 @@ export class TwitterService {
       id: tweet.id ?? undefined,
       text: tweet.text ?? '',
       createdAt: tweet.timeParsed ?? new Date(),
-      platform: 'twitter',
+      platform: SocialMediaPlatform.TWITTER,
       url: tweet.permanentUrl ?? undefined,
     });
   }
@@ -670,99 +698,10 @@ export class TwitterService {
           `Attempt ${attempt}/${this.maxRetries} for handle: ${handle}`,
         );
 
-        // Use the existing getRecentTweets method but bypass its authentication check
+        // Use the existing getRecentTweets method but skip its authentication check
         // since we've already ensured authentication at the batch level
-        const cacheKey = `twitter_posts_${handle}`;
-
-        // Check cache first
-        // const cachedPosts =
-        //   await this.cacheManager.get<SocialPostDto[]>(cacheKey);
-        // if (cachedPosts) {
-        //   this.logger.debug(`Returning cached Twitter posts for ${handle}`);
-        //   return cachedPosts;
-        // }
-
-        this.logger.debug(`Fetching fresh Twitter posts for ${handle}`);
-
-        // Fetch tweets using the scraper
-        const tweets: Tweet[] = [];
-        const cutoffDate = new Date();
-        cutoffDate.setDate(cutoffDate.getDate() - 90); // 90 days ago
-
-        this.logger.debug(
-          `Cutoff date for ${handle}: ${cutoffDate.toISOString()}`,
-        );
-
-        // Get tweets from the user's timeline
-        let count = 0;
-        let iteratorCount = 0;
-
-        try {
-          this.logger.debug(`Starting tweet iteration for ${handle}...`);
-
-          for await (const tweet of this.scraper.getTweets(handle, 15)) {
-            iteratorCount++;
-            this.logger.debug(
-              `${handle} - Tweet ${iteratorCount}: ${tweet.id}, ${tweet.timeParsed?.toISOString()}, text: "${tweet.text?.substring(0, 50)}..."`,
-            );
-
-            // Stop if we have enough tweets or if tweet is too old
-            if (tweets.length >= 10) {
-              this.logger.debug(`${handle} - Reached 10 tweets limit`);
-              break;
-            }
-
-            // Filter tweets from last 90 days
-            if (tweet.timeParsed && tweet.timeParsed >= cutoffDate) {
-              tweets.push(tweet);
-              this.logger.debug(
-                `${handle} - Added tweet ${tweet.id} (within 90 days)`,
-              );
-            } else if (tweet.timeParsed && tweet.timeParsed < cutoffDate) {
-              // Skip old tweets but don't break immediately as pinned tweets might be old
-              // but recent tweets could still exist after them
-              this.logger.debug(
-                `${handle} - Tweet ${tweet.id} is older than 90 days, skipping`,
-              );
-              // Note: Not breaking here to handle pinned tweets correctly
-            } else {
-              this.logger.debug(
-                `${handle} - Tweet ${tweet.id} has no timeParsed or invalid date`,
-              );
-            }
-
-            count++;
-            if (count >= 15) {
-              this.logger.debug(
-                `${handle} - Reached safety limit of 15 iterations`,
-              );
-              break;
-            }
-          }
-
-          this.logger.debug(
-            `${handle} - Iterator finished. Total iterations: ${iteratorCount}, Valid tweets found: ${tweets.length}`,
-          );
-        } catch (iteratorError) {
-          this.logger.error(
-            `${handle} - Error during tweet iteration: ${iteratorError.message}`,
-          );
-          throw iteratorError;
-        }
-
-        // Map to SocialPostDto
-        const socialPosts = tweets.map(tweet =>
-          this.mapTweetToSocialPost(tweet),
-        );
-
-        // Cache the results
-        await this.cacheManager.set(
-          cacheKey,
-          socialPosts,
-          this.cacheTtl * 1000,
-        );
-
-        return socialPosts;
+        const tweets = await this.getRecentTweetsInternal(handle);
+        return tweets;
       } catch (error) {
         lastError = error;
 
@@ -863,5 +802,241 @@ export class TwitterService {
       credentialsProvided: !!(username && password && email),
       cookiesFileExists: fs.existsSync(this.cookiesFilePath),
     };
+  }
+
+  /**
+   * Fetches recent tweets for a Twitter handle with incremental fetching support.
+   * Stops scraping when it encounters a tweet with a timestamp that already exists in the database.
+   * This method is designed for scheduled jobs to avoid re-scraping old tweets.
+   *
+   * Key features:
+   * - Stops when hitting tweets with timestamps that already exist in DB
+   * - Skips pinned tweets (isPin=true) unless they meet date criteria
+   * - Only returns new tweets not yet in database
+   *
+   * @param twitterHandle - The Twitter username (without @) or full profile URL
+   * @param sinceTimestamp - Optional timestamp to stop scraping when older tweets are encountered
+   * @returns Promise<SocialPostDto[]> - Array of new tweets not yet in database
+   */
+  async getRecentTweetsIncremental(
+    twitterHandle: string,
+    sinceTimestamp?: Date,
+  ): Promise<SocialPostDto[]> {
+    if (!twitterHandle || twitterHandle.trim() === '') {
+      this.logger.warn('Empty or invalid Twitter handle provided');
+      return [];
+    }
+
+    const cleanHandle = this.cleanTwitterHandle(twitterHandle);
+
+    try {
+      // Ensure we're authenticated before making requests
+      await this.ensureAuthenticated();
+
+      if (!this.isAuthenticated) {
+        this.logger.warn(
+          `Cannot fetch tweets for ${cleanHandle}: Not authenticated. Returning empty array.`,
+        );
+        return [];
+      }
+
+      this.logger.log(
+        `Fetching incremental Twitter posts for ${cleanHandle}${sinceTimestamp ? ` since ${sinceTimestamp.toISOString()}` : ''}`,
+      );
+
+      // Fetch tweets using the scraper with incremental logic
+      const tweets: Tweet[] = [];
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - 90); // 90 days ago
+
+      // Use the more restrictive date (either 90 days ago or sinceTimestamp)
+      const effectiveCutoffDate =
+        sinceTimestamp && sinceTimestamp > cutoffDate
+          ? sinceTimestamp
+          : cutoffDate;
+
+      this.logger.debug(
+        `Effective cutoff date for ${cleanHandle}: ${effectiveCutoffDate.toISOString()}`,
+      );
+
+      // Get tweets from the user's timeline
+      let count = 0;
+      let stoppedDueToOldTweet = false;
+      let skippedPinnedTweets = 0;
+
+      for await (const tweet of this.scraper.getTweets(cleanHandle, 30)) {
+        count++;
+
+        // Check if we've hit our limits
+        if (tweets.length >= 10) {
+          this.logger.debug(
+            `${cleanHandle} - Reached 10 tweets limit (incremental)`,
+          );
+          break;
+        }
+
+        if (count >= 30) {
+          this.logger.debug(
+            `${cleanHandle} - Reached safety limit of 30 iterations (incremental)`,
+          );
+          break;
+        }
+
+        // Skip pinned tweets unless they meet our date criteria
+        // Pinned tweets can be old and break chronological order
+        if (tweet.isPin) {
+          // Only include pinned tweets if they're within our date range
+          if (tweet.timeParsed && tweet.timeParsed >= effectiveCutoffDate) {
+            this.logger.debug(
+              `${cleanHandle} - Including pinned tweet ${tweet.id} from ${tweet.timeParsed.toISOString()} (within date range)`,
+            );
+            tweets.push(tweet);
+          } else {
+            this.logger.debug(
+              `${cleanHandle} - Skipping pinned tweet ${tweet.id} (outside date range or no timestamp)`,
+            );
+            skippedPinnedTweets++;
+          }
+          continue;
+        }
+
+        // Check if tweet is too old - STOP SCRAPING if we hit the cutoff
+        // This is the key incremental fetching logic
+        if (tweet.timeParsed && tweet.timeParsed < effectiveCutoffDate) {
+          this.logger.log(
+            `${cleanHandle} - Stopping incremental fetch: Tweet ${tweet.id} from ${tweet.timeParsed.toISOString()} is older than cutoff ${effectiveCutoffDate.toISOString()}`,
+          );
+          stoppedDueToOldTweet = true;
+          break;
+        }
+
+        // Include tweets that are within the time range
+        if (tweet.timeParsed && tweet.timeParsed >= effectiveCutoffDate) {
+          tweets.push(tweet);
+          this.logger.debug(
+            `${cleanHandle} - Added tweet ${tweet.id} from ${tweet.timeParsed.toISOString()} (incremental)`,
+          );
+        } else if (!tweet.timeParsed) {
+          this.logger.debug(
+            `${cleanHandle} - Tweet ${tweet.id} has no timeParsed, skipping (incremental)`,
+          );
+        }
+      }
+
+      // Map to SocialPostDto
+      const socialPosts = tweets.map(tweet => this.mapTweetToSocialPost(tweet));
+
+      this.logger.log(
+        `Incremental fetch for ${cleanHandle} completed: ${socialPosts.length} new tweets found${
+          stoppedDueToOldTweet ? ' (stopped due to old tweet detection)' : ''
+        }${
+          skippedPinnedTweets > 0
+            ? ` (skipped ${skippedPinnedTweets} pinned tweets)`
+            : ''
+        } (processed ${count} tweets total)`,
+      );
+
+      return socialPosts;
+    } catch (error) {
+      this.logger.error(
+        `Error in incremental fetch for ${cleanHandle}: ${error.message}`,
+        error.stack,
+      );
+
+      // Return empty array on error but don't throw - this allows the evaluation to continue
+      // with a score of 0 for social media components
+      return [];
+    }
+  }
+
+  /**
+   * Fetches recent tweets for multiple Twitter handles with incremental fetching support.
+   * This method is optimized for scheduled jobs and batch processing.
+   *
+   * @param accountsData - Array of objects with handle and optional sinceTimestamp for each account
+   * @returns Promise<HandleResult[]> - Array of results for each handle
+   */
+  async getRecentTweetsForHandlesIncremental(
+    accountsData: Array<{
+      handle: string;
+      sinceTimestamp?: Date;
+    }>,
+  ): Promise<HandleResult[]> {
+    if (accountsData.length === 0) {
+      this.logger.warn('Empty accounts array provided for incremental fetch');
+      return [];
+    }
+
+    this.logger.log(
+      `Starting incremental batch fetch for ${accountsData.length} handles`,
+    );
+
+    // Ensure we're authenticated before starting
+    await this.ensureAuthenticated();
+
+    if (!this.isAuthenticated) {
+      this.logger.warn(
+        'Cannot fetch tweets: Not authenticated. Returning empty results for all handles.',
+      );
+      return accountsData.map(({ handle }) => ({
+        handle: this.cleanTwitterHandle(handle),
+        posts: [],
+        success: false,
+        error: 'Not authenticated',
+      }));
+    }
+
+    const results: HandleResult[] = [];
+
+    for (let i = 0; i < accountsData.length; i++) {
+      const { handle, sinceTimestamp } = accountsData[i];
+      const cleanHandle = this.cleanTwitterHandle(handle);
+
+      this.logger.log(
+        `Processing handle ${i + 1}/${accountsData.length}: ${cleanHandle}${sinceTimestamp ? ` (since ${sinceTimestamp.toISOString()})` : ''}`,
+      );
+
+      try {
+        // Apply rate limiting delay before each request (except the first one)
+        if (i > 0) {
+          await this.applyRateLimit();
+        }
+
+        // Fetch tweets for this handle with incremental logic
+        const posts = await this.getRecentTweetsIncremental(
+          cleanHandle,
+          sinceTimestamp,
+        );
+
+        results.push({
+          handle: cleanHandle,
+          posts,
+          success: true,
+        });
+
+        this.logger.log(
+          `Successfully fetched ${posts.length} tweets for ${cleanHandle}`,
+        );
+      } catch (error) {
+        this.logger.error(
+          `Failed to fetch tweets for ${cleanHandle}: ${error.message}`,
+          error.stack,
+        );
+
+        results.push({
+          handle: cleanHandle,
+          posts: [],
+          success: false,
+          error: error.message,
+        });
+      }
+    }
+
+    const successCount = results.filter(r => r.success).length;
+    this.logger.log(
+      `Incremental batch fetch completed: ${successCount}/${accountsData.length} handles successful`,
+    );
+
+    return results;
   }
 }

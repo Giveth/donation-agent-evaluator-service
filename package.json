@@ -22,7 +22,12 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "migration:generate": "typeorm-ts-node-commonjs migration:generate -d src/data-source.ts",
+    "migration:create": "typeorm-ts-node-commonjs migration:create -d src/data-source.ts",
+    "migration:run": "typeorm-ts-node-commonjs migration:run -d src/data-source.ts",
+    "migration:revert": "typeorm-ts-node-commonjs migration:revert -d src/data-source.ts",
+    "migration:show": "typeorm-ts-node-commonjs migration:show -d src/data-source.ts"
   },
   "dependencies": {
     "@google/genai": "^1.0.1",
@@ -32,13 +37,17 @@
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.0.1",
     "@nestjs/platform-express": "^11.0.1",
+    "@nestjs/typeorm": "^11.0.0",
     "@the-convocation/twitter-scraper": "^0.17.0",
     "axios": "^1.9.0",
     "cache-manager": "^6.4.3",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
+    "dotenv": "^16.5.0",
+    "pg": "^8.16.0",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "typeorm": "^0.3.20"
   },
   "devDependencies": {
     "@eslint/compat": "^1.2.9",

@@ -1,5 +1,13 @@
-import { IsString, IsOptional, IsDate, IsIn, IsUrl } from 'class-validator';
+import { IsString, IsOptional, IsDate, IsUrl, IsEnum } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
+
+/**
+ * Enum for supported social media platforms
+ */
+export enum SocialMediaPlatform {
+  TWITTER = 'twitter',
+  FARCASTER = 'farcaster',
+}
 
 /**
  * DTO for standardized social media posts from different platforms.
@@ -39,8 +47,8 @@ export class SocialPostDto {
    * The platform where the post was published
    * @example "twitter"
    */
-  @IsIn(['twitter', 'farcaster'] as const)
-  platform!: 'twitter' | 'farcaster';
+  @IsEnum(SocialMediaPlatform)
+  platform!: SocialMediaPlatform;
 
   /**
    * Optional URL to the original post
@@ -54,7 +62,7 @@ export class SocialPostDto {
     id?: string;
     text: string;
     createdAt: Date | string;
-    platform: 'twitter' | 'farcaster';
+    platform: SocialMediaPlatform;
     url?: string;
   }) {
     this.id = data.id;
@@ -77,7 +85,7 @@ export function createSocialPostDto(post: {
   id?: string;
   text: string;
   createdAt: Date | string;
-  platform: 'twitter' | 'farcaster';
+  platform: SocialMediaPlatform;
   url?: string;
 }): SocialPostDto {
   return new SocialPostDto(post);

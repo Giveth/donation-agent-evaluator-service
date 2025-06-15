@@ -11,6 +11,7 @@ import { ConfigModule } from './core/config/config.module';
 import { CacheModule } from './core/cache/cache.module';
 import { SocialMediaModule } from './modules/social-media/social-media.module';
 import { SocialMediaStorageModule } from './modules/social-media-storage/social-media-storage.module';
+import { ScheduledJobsModule } from './modules/scheduled-jobs/scheduled-jobs.module';
 
 @Module({
   imports: [
@@ -113,6 +114,7 @@ import { SocialMediaStorageModule } from './modules/social-media-storage/social-
     }),
     SocialMediaModule,
     SocialMediaStorageModule,
+    ScheduledJobsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

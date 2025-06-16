@@ -7,6 +7,10 @@ import { SocialMediaPlatform } from '../../social-media/dto/social-post.dto';
 export interface ProjectAccountData {
   twitterHandle?: string;
   farcasterUsername?: string;
+  lastTwitterFetch?: Date;
+  lastFarcasterFetch?: Date;
+  latestTwitterPostTimestamp?: Date;
+  latestFarcasterPostTimestamp?: Date;
   metadata?: Record<string, unknown>;
 }
 
@@ -29,9 +33,27 @@ export class ProjectSocialAccountService {
       });
 
       if (projectAccount) {
-        // Update existing account
-        projectAccount.twitterHandle = data.twitterHandle;
-        projectAccount.farcasterUsername = data.farcasterUsername;
+        // Update existing account - only update fields that are provided
+        if (data.twitterHandle !== undefined) {
+          projectAccount.twitterHandle = data.twitterHandle;
+        }
+        if (data.farcasterUsername !== undefined) {
+          projectAccount.farcasterUsername = data.farcasterUsername;
+        }
+        if (data.lastTwitterFetch !== undefined) {
+          projectAccount.lastTwitterFetch = data.lastTwitterFetch;
+        }
+        if (data.lastFarcasterFetch !== undefined) {
+          projectAccount.lastFarcasterFetch = data.lastFarcasterFetch;
+        }
+        if (data.latestTwitterPostTimestamp !== undefined) {
+          projectAccount.latestTwitterPostTimestamp =
+            data.latestTwitterPostTimestamp;
+        }
+        if (data.latestFarcasterPostTimestamp !== undefined) {
+          projectAccount.latestFarcasterPostTimestamp =
+            data.latestFarcasterPostTimestamp;
+        }
         if (data.metadata) {
           projectAccount.metadata = {
             ...projectAccount.metadata,
@@ -46,6 +68,10 @@ export class ProjectSocialAccountService {
           projectId,
           twitterHandle: data.twitterHandle,
           farcasterUsername: data.farcasterUsername,
+          lastTwitterFetch: data.lastTwitterFetch,
+          lastFarcasterFetch: data.lastFarcasterFetch,
+          latestTwitterPostTimestamp: data.latestTwitterPostTimestamp,
+          latestFarcasterPostTimestamp: data.latestFarcasterPostTimestamp,
           metadata: data.metadata,
         });
         await this.projectAccountRepository.save(projectAccount);

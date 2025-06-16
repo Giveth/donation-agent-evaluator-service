@@ -4,6 +4,7 @@ import { SocialMediaStorageModule } from '../social-media-storage/social-media-s
 import { SocialMediaModule } from '../social-media/social-media.module';
 import { ScheduledJob } from '../social-media-storage/entities/scheduled-job.entity';
 import { JobSchedulerService } from './services/job-scheduler.service';
+import { JobProcessorService } from './services/job-processor.service';
 
 @Module({
   imports: [
@@ -11,7 +12,7 @@ import { JobSchedulerService } from './services/job-scheduler.service';
     SocialMediaStorageModule,
     SocialMediaModule,
   ],
-  providers: [JobSchedulerService],
-  exports: [JobSchedulerService],
+  providers: [JobSchedulerService, JobProcessorService],
+  exports: [JobSchedulerService, JobProcessorService],
 })
 export class ScheduledJobsModule {}

@@ -12,6 +12,7 @@ import { TwitterService } from '../../social-media/services/twitter.service';
 import { FarcasterService } from '../../social-media/services/farcaster.service';
 import { SocialPostStorageService } from '../../social-media-storage/services/social-post-storage.service';
 import { ProjectSocialAccountService } from '../../social-media-storage/services/project-social-account.service';
+import { TwitterFetchProcessor } from '../processors/twitter-fetch.processor';
 
 /**
  * Service responsible for processing scheduled jobs from the database.
@@ -55,6 +56,7 @@ export class JobProcessorService {
     private readonly socialPostStorageService: SocialPostStorageService,
     private readonly projectSocialAccountService: ProjectSocialAccountService,
     private readonly configService: ConfigService,
+    private readonly twitterFetchProcessor: TwitterFetchProcessor,
   ) {
     // Initialize configuration with defaults
     this.batchSize = parseInt(
@@ -295,66 +297,19 @@ export class JobProcessorService {
   }
 
   /**
-   * Processes a Twitter fetch job.
+   * Processes a Twitter fetch job using the dedicated TwitterFetchProcessor.
    *
    * @param job - The Twitter fetch job to process
    * @returns Promise<boolean> - True if successful, false if failed
    */
   private async processTwitterFetchJob(job: ScheduledJob): Promise<boolean> {
     try {
-      // Get project's social media account information
-      const projectAccount =
-        await this.projectSocialAccountService.getProjectAccount(job.projectId);
-
-      if (!projectAccount?.twitterHandle) {
-        this.logger.warn(
-          `No Twitter handle found for project ${job.projectId}`,
-        );
-        return false;
-      }
-
-      // Get the latest Twitter post timestamp for incremental fetching
-      const sinceTimestamp = projectAccount.latestTwitterPostTimestamp;
-
-      this.logger.debug(
-        `Fetching Twitter posts for handle ${projectAccount.twitterHandle} since ${sinceTimestamp?.toISOString() ?? 'beginning'}`,
-      );
-
-      // Fetch recent tweets using incremental fetching if available
-      const tweets =
-        typeof this.twitterService.getRecentTweetsIncremental === 'function'
-          ? await this.twitterService.getRecentTweetsIncremental(
-              projectAccount.twitterHandle,
-              sinceTimestamp,
-            )
-          : await this.twitterService.getRecentTweets(
-              projectAccount.twitterHandle,
-            );
-
-      if (tweets.length === 0) {
-        this.logger.debug(`No new tweets found for project ${job.projectId}`);
-        return true; // No new tweets is considered a success
-      }
-
-      // Store the fetched tweets in the database
-      const storageResult =
-        await this.socialPostStorageService.storeSocialPostsIncremental(
-          job.projectId,
-          tweets,
-        );
-
-      this.logger.debug(
-        `Stored ${storageResult.stored} new tweets for project ${job.projectId}`,
-        {
-          duplicatesFound: storageResult.duplicatesFound,
-          stoppedAtTimestamp: storageResult.stoppedAtTimestamp?.toISOString(),
-        },
-      );
-
+      // Use the dedicated TwitterFetchProcessor for comprehensive Twitter fetch handling
+      await this.twitterFetchProcessor.processTwitterFetch(job);
       return true;
     } catch (error) {
       this.logger.error(
-        `Failed to process Twitter fetch job for project ${job.projectId}:`,
+        `TwitterFetchProcessor failed for project ${job.projectId}:`,
         error,
       );
       return false;

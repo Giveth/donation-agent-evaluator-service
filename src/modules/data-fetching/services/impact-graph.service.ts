@@ -4,16 +4,10 @@ import { HttpService } from '@nestjs/axios';
 import { GraphQLClient, ClientError } from 'graphql-request';
 import { GraphQLError as BaseGraphQLError } from 'graphql';
 import {
-  CAUSES_QUERY,
-  CAUSE_BY_ID_QUERY,
   PROJECT_BY_SLUG_QUERY,
   PROJECTS_BY_SLUGS_QUERY,
   PROJECT_UPDATES_QUERY,
 } from '../graphql/queries';
-import {
-  CauseDetailsDto,
-  createCauseDetailsDto,
-} from '../dto/cause-details.dto';
 import {
   ProjectDetailsDto,
   createProjectDetailsDto,
@@ -21,7 +15,7 @@ import {
 
 /**
  * Service for interacting with Giveth Impact-Graph GraphQL API
- * Handles fetching cause and project data for evaluation purposes
+ * Handles fetching project data for evaluation purposes
  */
 @Injectable()
 export class ImpactGraphService {
@@ -50,88 +44,6 @@ export class ImpactGraphService {
     this.logger.log(
       `Initialized ImpactGraphService with endpoint: ${this.baseUrl}`,
     );
-  }
-
-  /**
-   * Fetch all causes with pagination support
-   * @param limit - Maximum number of causes to return (default: 50, max: 100)
-   * @param offset - Number of causes to skip (default: 0)
-   * @returns Array of cause details
-   */
-  async getAllCauses(
-    limit: number = 50,
-    offset: number = 0,
-  ): Promise<CauseDetailsDto[]> {
-    try {
-      this.logger.debug(
-        `Fetching causes with limit: ${limit}, offset: ${offset}`,
-      );
-
-      // Ensure limit doesn't exceed maximum
-      const effectiveLimit = Math.min(limit, 100);
-
-      const variables = {
-        limit: effectiveLimit,
-        offset,
-      };
-
-      const response = await this.graphqlClient.request<{ causes: any[] }>(
-        CAUSES_QUERY,
-        variables,
-      );
-
-      const causes = response.causes.map(cause => createCauseDetailsDto(cause));
-
-      this.logger.log(`Successfully fetched ${causes.length} causes`);
-      return causes;
-    } catch (error) {
-      this.handleGraphQLError(error, 'getAllCauses');
-      throw new HttpException(
-        'Failed to fetch causes from Impact-Graph',
-        HttpStatus.SERVICE_UNAVAILABLE,
-      );
-    }
-  }
-
-  /**
-   * Fetch a specific cause by ID with detailed project information
-   * @param id - The cause ID to fetch
-   * @returns Detailed cause information including projects
-   */
-  async getCauseById(id: number): Promise<CauseDetailsDto> {
-    try {
-      this.logger.debug(`Fetching cause with ID: ${id}`);
-
-      const variables = { id };
-
-      const response = await this.graphqlClient.request<{ cause: any }>(
-        CAUSE_BY_ID_QUERY,
-        variables,
-      );
-
-      if (!response.cause) {
-        this.logger.warn(`Cause not found with ID: ${id}`);
-        throw new HttpException(
-          `Cause not found with ID: ${id}`,
-          HttpStatus.NOT_FOUND,
-        );
-      }
-
-      const cause = createCauseDetailsDto(response.cause);
-
-      this.logger.log(`Successfully fetched cause: ${cause.title} (ID: ${id})`);
-      return cause;
-    } catch (error) {
-      if (error instanceof HttpException) {
-        throw error;
-      }
-
-      this.handleGraphQLError(error, 'getCauseById');
-      throw new HttpException(
-        `Failed to fetch cause with ID: ${id}`,
-        HttpStatus.SERVICE_UNAVAILABLE,
-      );
-    }
   }
 
   /**
@@ -289,13 +201,25 @@ export class ImpactGraphService {
     try {
       this.logger.debug('Performing health check on Impact-Graph service');
 
-      // Try to fetch a small amount of data to verify connectivity
-      const response = await this.graphqlClient.request<{ causes: any[] }>(
-        CAUSES_QUERY,
-        { limit: 1, offset: 0 },
-      );
+      // Try to fetch projects data with minimal parameters to verify connectivity
+      const response = await this.graphqlClient.request<{
+        projectsBySlugs: {
+          projects: any[];
+          totalCount: number;
+        };
+      }>(PROJECTS_BY_SLUGS_QUERY, {
+        slugs: [],
+        take: 1,
+        skip: 0,
+        orderBy: {
+          field: 'CreationDate',
+          direction: 'DESC',
+        },
+      });
 
-      const isHealthy = Array.isArray(response.causes);
+      const isHealthy =
+        response.projectsBySlugs &&
+        Array.isArray(response.projectsBySlugs.projects);
 
       if (isHealthy) {
         this.logger.log('Impact-Graph service health check passed');

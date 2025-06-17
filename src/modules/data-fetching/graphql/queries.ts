@@ -1,91 +1,6 @@
 import { gql } from 'graphql-request';
 
 /**
- * Query to fetch all causes with basic information and associated projects
- */
-export const CAUSES_QUERY = gql`
-  query GetCauses($limit: Float, $offset: Float) {
-    causes(limit: $limit, offset: $offset) {
-      id
-      title
-      description
-      mainCategory
-      subCategories
-      status
-      projects {
-        id
-        slug
-        title
-      }
-      activeProjectsCount
-      totalRaised
-      totalDistributed
-      totalDonated
-      createdAt
-      updatedAt
-    }
-  }
-`;
-
-/**
- * Query to fetch a specific cause by ID with detailed project information
- */
-export const CAUSE_BY_ID_QUERY = gql`
-  query GetCauseById($id: Float!) {
-    cause(id: $id) {
-      id
-      title
-      description
-      mainCategory
-      subCategories
-      status
-      projects {
-        id
-        slug
-        title
-        description
-        descriptionSummary
-        verified
-        qualityScore
-        totalDonations
-        totalReactions
-        totalProjectUpdates
-        updatedAt
-        latestUpdateCreationDate
-        projectPower {
-          powerRank
-          totalPower
-        }
-        adminUser {
-          id
-          name
-          walletAddress
-        }
-        socialMedia {
-          type
-          link
-        }
-        projectUpdate {
-          id
-          title
-          content
-          createdAt
-        }
-        isGivbackEligible
-        listed
-        giveBacks
-      }
-      activeProjectsCount
-      totalRaised
-      totalDistributed
-      totalDonated
-      createdAt
-      updatedAt
-    }
-  }
-`;
-
-/**
  * Query to fetch detailed project information by slug
  */
 export const PROJECT_BY_SLUG_QUERY = gql`
@@ -201,14 +116,6 @@ export const PROJECT_BY_SLUG_QUERY = gql`
         round
       }
 
-      # Causes this project belongs to
-      causes {
-        id
-        title
-        description
-        mainCategory
-      }
-
       # Organization information
       organization {
         id
@@ -315,10 +222,6 @@ export const PROJECTS_BY_SLUGS_QUERY = gql`
           title
           content
           createdAt
-        }
-        causes {
-          id
-          title
         }
       }
       totalCount

@@ -66,10 +66,6 @@ export class ProjectSocialAccount {
   @Column({ name: 'last_update_content', type: 'text', nullable: true })
   lastUpdateContent?: string;
 
-  // Cause relationships
-  @Column({ name: 'causes_ids', type: 'jsonb', nullable: true })
-  causesIds?: number[];
-
   // Social media handles
   @Column({ name: 'twitter_handle', nullable: true })
   twitterHandle?: string;

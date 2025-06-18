@@ -257,3 +257,216 @@ export const PROJECT_UPDATES_QUERY = gql`
     }
   }
 `;
+
+/**
+ * Query to fetch all causes with their associated projects
+ * This is optimized to get all project data in a single query rather than fetching projects separately
+ */
+export const ALL_CAUSES_WITH_PROJECTS_QUERY = gql`
+  query GetAllCausesWithProjects($limit: Float, $offset: Float) {
+    causes(limit: $limit, offset: $offset) {
+      id
+      title
+      description
+      chainId
+      fundingPoolAddress
+      causeId
+      givpowerRank
+      instantBoostingRank
+      mainCategory
+      subCategories
+      status
+      listingStatus
+      activeProjectsCount
+      totalRaised
+      totalDistributed
+      totalDonated
+      createdAt
+      updatedAt
+
+      # Owner information
+      owner {
+        id
+        name
+        walletAddress
+      }
+
+      # All projects in this cause with complete data for sync
+      projects {
+        id
+        title
+        slug
+        description
+        descriptionSummary
+        website
+        youtube
+        creationDate
+        updatedAt
+        latestUpdateCreationDate
+        image
+        impactLocation
+        verified
+        verificationStatus
+        isImported
+        giveBacks
+        qualityScore
+        totalDonations
+        totalTraceDonations
+        totalReactions
+        totalProjectUpdates
+        countUniqueDonors
+        listed
+        isGivbackEligible
+        reviewStatus
+
+        # Project status
+        status {
+          id
+          symbol
+          name
+          description
+        }
+
+        # Admin user (contains social media handles)
+        adminUser {
+          id
+          firstName
+          lastName
+          name
+          walletAddress
+          avatar
+          url
+          location
+        }
+
+        # Categories
+        categories {
+          id
+          name
+          value
+          mainCategory {
+            id
+            title
+            slug
+          }
+        }
+
+        # Social media links
+        socialMedia {
+          id
+          type
+          link
+        }
+
+        # Latest project update for content analysis
+        projectUpdate {
+          id
+          title
+          content
+          contentSummary
+          createdAt
+          isMain
+          totalReactions
+        }
+
+        # Power ranking information
+        projectPower {
+          projectId
+          totalPower
+          powerRank
+          round
+        }
+
+        # Instant power ranking
+        projectInstantPower {
+          projectId
+          totalPower
+          powerRank
+        }
+
+        # Future power ranking
+        projectFuturePower {
+          projectId
+          totalPower
+          powerRank
+          round
+        }
+
+        # Organization information
+        organization {
+          id
+          name
+          label
+          website
+        }
+
+        # Social profiles from verification
+        socialProfiles {
+          id
+          socialNetwork
+          name
+          link
+          isVerified
+        }
+
+        # Project verification form for additional social profiles
+        projectVerificationForm {
+          socialProfiles {
+            socialNetwork
+            socialNetworkId
+            name
+            link
+            isVerified
+          }
+        }
+      }
+    }
+  }
+`;
+
+/**
+ * Query to fetch a specific cause by ID with its projects
+ */
+export const CAUSE_BY_ID_QUERY = gql`
+  query GetCauseById($id: Float!) {
+    cause(id: $id) {
+      id
+      title
+      description
+      chainId
+      fundingPoolAddress
+      causeId
+      givpowerRank
+      instantBoostingRank
+      mainCategory
+      subCategories
+      status
+      listingStatus
+      activeProjectsCount
+      totalRaised
+      totalDistributed
+      totalDonated
+      createdAt
+      updatedAt
+
+      # Owner information
+      owner {
+        id
+        name
+        walletAddress
+      }
+
+      # Projects in this cause (minimal data for getting slugs)
+      projects {
+        id
+        slug
+        title
+        status {
+          id
+          symbol
+          name
+        }
+      }
+    }
+  }
+`;

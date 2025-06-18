@@ -13,6 +13,7 @@ import { FarcasterService } from '../../social-media/services/farcaster.service'
 import { SocialPostStorageService } from '../../social-media-storage/services/social-post-storage.service';
 import { ProjectSocialAccountService } from '../../social-media-storage/services/project-social-account.service';
 import { TwitterFetchProcessor } from '../processors/twitter-fetch.processor';
+import { ProjectSyncProcessor } from '../processors/project-sync.processor';
 
 /**
  * Service responsible for processing scheduled jobs from the database.
@@ -57,6 +58,7 @@ export class JobProcessorService {
     private readonly projectSocialAccountService: ProjectSocialAccountService,
     private readonly configService: ConfigService,
     private readonly twitterFetchProcessor: TwitterFetchProcessor,
+    private readonly projectSyncProcessor: ProjectSyncProcessor,
   ) {
     // Initialize configuration with defaults
     this.batchSize = parseInt(
@@ -283,10 +285,7 @@ export class JobProcessorService {
         return this.processFarcasterFetchJob(job);
 
       case JobType.PROJECT_SYNC:
-        this.logger.warn(
-          `PROJECT_SYNC job type not yet implemented for job ${job.id}`,
-        );
-        return false;
+        return this.processProjectSyncJob(job);
 
       default:
         this.logger.error(
@@ -390,6 +389,26 @@ export class JobProcessorService {
     } catch (error) {
       this.logger.error(
         `Failed to process Farcaster fetch job for project ${job.projectId}:`,
+        error,
+      );
+      return false;
+    }
+  }
+
+  /**
+   * Processes a project sync job using the dedicated ProjectSyncProcessor.
+   *
+   * @param job - The project sync job to process
+   * @returns Promise<boolean> - True if successful, false if failed
+   */
+  private async processProjectSyncJob(job: ScheduledJob): Promise<boolean> {
+    try {
+      // Use the dedicated ProjectSyncProcessor for comprehensive project sync handling
+      await this.projectSyncProcessor.processProjectSync(job);
+      return true;
+    } catch (error) {
+      this.logger.error(
+        `ProjectSyncProcessor failed for job ${job.id}:`,
         error,
       );
       return false;

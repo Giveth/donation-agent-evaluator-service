@@ -58,3 +58,4 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 /docs_old
 /rules
 twitter_cookies.json
+.mcp.json

@@ -18,6 +18,55 @@ export class ProjectSocialAccount {
   @Column({ name: 'project_id', unique: true })
   projectId: string;
 
+  // Project basic information
+  @Column({ name: 'title', type: 'varchar', length: 255 })
+  title: string;
+
+  @Column({ name: 'slug', type: 'varchar', length: 255 })
+  slug: string;
+
+  @Column({ name: 'description', type: 'text', nullable: true })
+  description?: string;
+
+  @Column({ name: 'project_status', type: 'varchar', length: 100 })
+  projectStatus: string;
+
+  @Column({ name: 'verified', type: 'boolean', default: false })
+  verified: boolean;
+
+  // Project metrics
+  @Column({
+    name: 'quality_score',
+    type: 'decimal',
+    precision: 5,
+    scale: 2,
+    nullable: true,
+  })
+  qualityScore?: number;
+
+  @Column({ name: 'giv_power_rank', type: 'integer', nullable: true })
+  givPowerRank?: number;
+
+  @Column({
+    name: 'total_donations',
+    type: 'decimal',
+    precision: 15,
+    scale: 2,
+    default: 0,
+  })
+  totalDonations: number;
+
+  @Column({ name: 'total_reactions', type: 'integer', default: 0 })
+  totalReactions: number;
+
+  // Project update information
+  @Column({ name: 'last_update_date', type: 'timestamp', nullable: true })
+  lastUpdateDate?: Date;
+
+  @Column({ name: 'last_update_content', type: 'text', nullable: true })
+  lastUpdateContent?: string;
+
+  // Social media handles
   @Column({ name: 'twitter_handle', nullable: true })
   twitterHandle?: string;
 

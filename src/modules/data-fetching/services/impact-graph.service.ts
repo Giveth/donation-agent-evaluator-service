@@ -1,0 +1,501 @@
+import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { HttpService } from '@nestjs/axios';
+import { GraphQLClient, ClientError } from 'graphql-request';
+import { GraphQLError as BaseGraphQLError } from 'graphql';
+import {
+  PROJECT_BY_SLUG_QUERY,
+  PROJECTS_BY_SLUGS_QUERY,
+  PROJECT_UPDATES_QUERY,
+  ALL_CAUSES_WITH_PROJECTS_QUERY,
+  CAUSE_BY_ID_QUERY,
+} from '../graphql/queries';
+import {
+  ProjectDetailsDto,
+  createProjectDetailsDto,
+} from '../dto/project-details.dto';
+import {
+  CauseDetailsDto,
+  CauseProjectSlugsDto,
+  createCauseDetailsDto,
+  createCauseProjectSlugsDto,
+} from '../dto/cause-details.dto';
+
+/**
+ * Type definitions for GraphQL responses
+ */
+type GraphQLProjectData = Record<string, unknown>;
+type GraphQLCauseData = Record<string, unknown>;
+type GraphQLError = unknown;
+
+/**
+ * Service for interacting with Giveth Impact-Graph GraphQL API
+ * Handles fetching project data for evaluation purposes
+ */
+@Injectable()
+export class ImpactGraphService {
+  private readonly logger = new Logger(ImpactGraphService.name);
+  private readonly graphqlClient: GraphQLClient;
+  private readonly baseUrl: string;
+
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly httpService: HttpService,
+  ) {
+    // Set the base URL for the Impact-Graph GraphQL endpoint
+    this.baseUrl = this.configService.get<string>(
+      'IMPACT_GRAPH_URL',
+      'https://impact-graph.serve.giveth.io/graphql',
+    );
+
+    // Initialize GraphQL client
+    this.graphqlClient = new GraphQLClient(this.baseUrl, {
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Donation-Evaluator-Service/1.0',
+      },
+    });
+
+    this.logger.log(
+      `Initialized ImpactGraphService with endpoint: ${this.baseUrl}`,
+    );
+  }
+
+  /**
+   * Fetch detailed project information by slug
+   * @param slug - The project slug to fetch
+   * @param connectedWalletUserId - Optional user ID for personalized data
+   * @returns Detailed project information
+   */
+  async getProjectBySlug(
+    slug: string,
+    connectedWalletUserId?: number,
+  ): Promise<ProjectDetailsDto> {
+    try {
+      this.logger.debug(`Fetching project with slug: ${slug}`);
+
+      const variables = {
+        slug,
+        connectedWalletUserId,
+      };
+
+      const response = await this.graphqlClient.request<{
+        projectBySlug: GraphQLProjectData | null;
+      }>(PROJECT_BY_SLUG_QUERY, variables);
+
+      if (
+        !response.projectBySlug ||
+        Object.keys(response.projectBySlug).length === 0
+      ) {
+        this.logger.warn(`Project not found with slug: ${slug}`);
+        throw new HttpException(
+          `Project not found with slug: ${slug}`,
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      const project = createProjectDetailsDto(response.projectBySlug);
+
+      this.logger.log(
+        `Successfully fetched project: ${project.title} (slug: ${slug})`,
+      );
+      return project;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.handleGraphQLError(error as GraphQLError, 'getProjectBySlug');
+      throw new HttpException(
+        `Failed to fetch project with slug: ${slug}`,
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    }
+  }
+
+  /**
+   * Fetch multiple projects by their slugs with pagination
+   * @param slugs - Array of project slugs to fetch
+   * @param connectedWalletUserId - Optional user ID for personalized data
+   * @param take - Number of projects to return (default: 50)
+   * @param skip - Number of projects to skip (default: 0)
+   * @returns Array of project details and total count
+   */
+  async getProjectsBySlugs(
+    slugs: string[],
+    connectedWalletUserId?: number,
+    take: number = 50,
+    skip: number = 0,
+  ): Promise<{ projects: ProjectDetailsDto[]; totalCount: number }> {
+    try {
+      this.logger.debug(`Fetching ${slugs.length} projects by slugs`);
+
+      const variables = {
+        slugs,
+        connectedWalletUserId,
+        take,
+        skip,
+        orderBy: {
+          field: 'CreationDate',
+          direction: 'DESC',
+        },
+      };
+
+      const response = await this.graphqlClient.request<{
+        projectsBySlugs: {
+          projects: GraphQLProjectData[];
+          totalCount: number;
+        };
+      }>(PROJECTS_BY_SLUGS_QUERY, variables);
+
+      const projects = response.projectsBySlugs.projects.map(project =>
+        createProjectDetailsDto(project),
+      );
+
+      this.logger.log(
+        `Successfully fetched ${projects.length} projects by slugs`,
+      );
+      return {
+        projects,
+        totalCount: response.projectsBySlugs.totalCount,
+      };
+    } catch (error) {
+      this.handleGraphQLError(error as GraphQLError, 'getProjectsBySlugs');
+      throw new HttpException(
+        'Failed to fetch projects by slugs from Impact-Graph',
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    }
+  }
+
+  /**
+   * Fetch project updates for a specific project
+   * @param projectId - The project ID to fetch updates for
+   * @param take - Number of updates to return (default: 10)
+   * @param skip - Number of updates to skip (default: 0)
+   * @returns Array of project updates
+   */
+  async getProjectUpdates(
+    projectId: number,
+    take: number = 10,
+    skip: number = 0,
+  ): Promise<unknown[]> {
+    try {
+      this.logger.debug(`Fetching updates for project ID: ${projectId}`);
+
+      const variables = {
+        projectId,
+        take,
+        skip,
+        orderBy: {
+          field: 'CreationAt',
+          direction: 'DESC',
+        },
+      };
+
+      const response = await this.graphqlClient.request<{
+        getProjectUpdates: unknown[];
+      }>(PROJECT_UPDATES_QUERY, variables);
+
+      const updates = response.getProjectUpdates;
+
+      this.logger.log(
+        `Successfully fetched ${updates.length} updates for project ${projectId}`,
+      );
+      return updates;
+    } catch (error) {
+      this.handleGraphQLError(error as GraphQLError, 'getProjectUpdates');
+      // Don't throw for project updates - this is not critical
+      return [];
+    }
+  }
+
+  /**
+   * Fetch all causes with their associated projects in a single optimized query
+   * This is the most efficient way to get all project data for synchronization
+   * @param limit - Number of causes to return (default: 100)
+   * @param offset - Number of causes to skip (default: 0)
+   * @returns Array of causes with complete project data
+   */
+  async getAllCausesWithProjects(
+    limit: number = 100,
+    offset: number = 0,
+  ): Promise<{
+    causes: Array<{ cause: CauseDetailsDto; projects: ProjectDetailsDto[] }>;
+    totalProcessed: number;
+  }> {
+    try {
+      this.logger.debug(
+        `Fetching all causes with projects (limit: ${limit}, offset: ${offset})`,
+      );
+
+      const variables = {
+        limit,
+        offset,
+      };
+
+      const response = await this.graphqlClient.request<{
+        causes: GraphQLCauseData[] | null;
+      }>(ALL_CAUSES_WITH_PROJECTS_QUERY, variables);
+
+      if (!response.causes || response.causes.length === 0) {
+        this.logger.warn('No causes found in GraphQL response');
+        return { causes: [], totalProcessed: 0 };
+      }
+
+      const processedCauses = response.causes.map(causeData => {
+        // Create cause DTO
+        const cause = createCauseDetailsDto(causeData);
+
+        // Process projects separately to avoid circular dependency
+        const projects = (
+          (causeData as { projects?: GraphQLProjectData[] }).projects ?? []
+        ).map((project: GraphQLProjectData) =>
+          createProjectDetailsDto(project),
+        );
+
+        return { cause, projects };
+      });
+
+      this.logger.log(
+        `Successfully fetched ${processedCauses.length} causes with ${processedCauses.reduce((sum, c) => sum + c.projects.length, 0)} total projects`,
+      );
+
+      return {
+        causes: processedCauses,
+        totalProcessed: processedCauses.length,
+      };
+    } catch (error) {
+      this.handleGraphQLError(
+        error as GraphQLError,
+        'getAllCausesWithProjects',
+      );
+      throw new HttpException(
+        'Failed to fetch causes with projects from Impact-Graph',
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    }
+  }
+
+  /**
+   * Fetch a specific cause by ID with minimal project data (slugs only)
+   * Useful when you need to fetch projects individually later
+   * @param causeId - The cause ID to fetch
+   * @returns Cause details with project slugs
+   */
+  async getCauseById(causeId: number): Promise<CauseProjectSlugsDto> {
+    try {
+      this.logger.debug(`Fetching cause with ID: ${causeId}`);
+
+      const variables = {
+        id: causeId,
+      };
+
+      const response = await this.graphqlClient.request<{
+        cause: GraphQLCauseData | null;
+      }>(CAUSE_BY_ID_QUERY, variables);
+
+      if (!response.cause || Object.keys(response.cause).length === 0) {
+        this.logger.warn(`Cause not found with ID: ${causeId}`);
+        throw new HttpException(
+          `Cause not found with ID: ${causeId}`,
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      const cause = createCauseProjectSlugsDto(response.cause);
+
+      this.logger.log(
+        `Successfully fetched cause: ${cause.title} (ID: ${causeId}) with ${cause.projectSlugs.length} projects`,
+      );
+      return cause;
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.handleGraphQLError(error as GraphQLError, 'getCauseById');
+      throw new HttpException(
+        `Failed to fetch cause with ID: ${causeId}`,
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    }
+  }
+
+  /**
+   * Get all unique project slugs from all causes
+   * Useful for batch synchronization scenarios
+   * @returns Array of unique project slugs across all causes
+   */
+  async getAllProjectSlugsFromCauses(): Promise<string[]> {
+    try {
+      this.logger.debug('Fetching all unique project slugs from causes');
+
+      // Start with first batch
+      const allSlugs = new Set<string>();
+      let offset = 0;
+      const limit = 50; // Reasonable batch size
+      let hasMore = true;
+
+      while (hasMore) {
+        const { causes } = await this.getAllCausesWithProjects(limit, offset);
+
+        if (causes.length === 0) {
+          hasMore = false;
+          break;
+        }
+
+        // Extract slugs from all projects
+        causes.forEach(({ projects }) => {
+          projects.forEach(project => {
+            if (project.slug && project.slug.trim() !== '') {
+              allSlugs.add(project.slug);
+            }
+          });
+        });
+
+        offset += limit;
+        hasMore = causes.length === limit; // If we got less than limit, we're done
+      }
+
+      const uniqueSlugs = Array.from(allSlugs);
+      this.logger.log(
+        `Found ${uniqueSlugs.length} unique project slugs across all causes`,
+      );
+
+      return uniqueSlugs;
+    } catch (error) {
+      this.handleGraphQLError(
+        error as GraphQLError,
+        'getAllProjectSlugsFromCauses',
+      );
+      throw new HttpException(
+        'Failed to fetch project slugs from causes',
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    }
+  }
+
+  /**
+   * Check if the Impact-Graph service is healthy
+   * @returns Boolean indicating service health
+   */
+  async healthCheck(): Promise<boolean> {
+    try {
+      this.logger.debug('Performing health check on Impact-Graph service');
+
+      // Try to fetch projects data with minimal parameters to verify connectivity
+      const response = await this.graphqlClient.request<{
+        projectsBySlugs: {
+          projects: GraphQLProjectData[];
+          totalCount: number;
+        };
+      }>(PROJECTS_BY_SLUGS_QUERY, {
+        slugs: [],
+        take: 1,
+        skip: 0,
+        orderBy: {
+          field: 'CreationDate',
+          direction: 'DESC',
+        },
+      });
+
+      // Validate response structure
+      const isValidResponse = Array.isArray(response.projectsBySlugs.projects);
+
+      if (isValidResponse) {
+        this.logger.log('Impact-Graph service health check passed');
+      } else {
+        this.logger.warn(
+          'Impact-Graph service health check failed - unexpected response format',
+        );
+      }
+
+      return isValidResponse;
+    } catch (error) {
+      this.logger.error(
+        'Impact-Graph service health check failed',
+        error as GraphQLError,
+      );
+      return false;
+    }
+  }
+
+  /**
+   * Handle GraphQL errors and log appropriate details
+   * @param error - The error object from GraphQL request
+   * @param operation - The operation that failed
+   */
+  private handleGraphQLError(error: GraphQLError, operation: string): void {
+    if (error instanceof ClientError) {
+      // GraphQL-specific error handling
+      this.logger.error(`GraphQL error in ${operation}:`, {
+        message: error.message,
+        query: error.request.query,
+        variables: error.request.variables,
+        errors: error.response.errors,
+        status: error.response.status,
+      });
+
+      // Log individual GraphQL errors
+      if (error.response.errors) {
+        error.response.errors.forEach(
+          (gqlError: BaseGraphQLError, index: number) => {
+            this.logger.error(`GraphQL Error ${index + 1}:`, {
+              message: gqlError.message,
+              path: gqlError.path,
+              locations: gqlError.locations?.map(loc => ({
+                line: loc.line,
+                column: loc.column,
+              })),
+              extensions: gqlError.extensions,
+            });
+          },
+        );
+      }
+    } else if (
+      (error as { code?: string }).code === 'ENOTFOUND' ||
+      (error as { code?: string }).code === 'ECONNREFUSED'
+    ) {
+      // Network connectivity issues
+      this.logger.error(`Network error in ${operation}:`, {
+        message: (error as { message: string }).message,
+        code: (error as { code: string }).code,
+        hostname: (error as { hostname?: string }).hostname,
+      });
+    } else if ((error as { code?: string }).code === 'ETIMEDOUT') {
+      // Timeout issues
+      this.logger.error(`Timeout error in ${operation}:`, {
+        message: (error as { message: string }).message,
+        timeout: (error as { timeout?: number }).timeout,
+      });
+    } else {
+      // Generic error handling
+      this.logger.error(`Unexpected error in ${operation}:`, {
+        message: (error as { message: string }).message,
+        stack: (error as { stack?: string }).stack,
+        name: (error as { name?: string }).name,
+      });
+    }
+  }
+
+  /**
+   * Get the current GraphQL endpoint URL
+   * @returns The GraphQL endpoint URL
+   */
+  getEndpointUrl(): string {
+    return this.baseUrl;
+  }
+
+  /**
+   * Update GraphQL client configuration if needed
+   * @param options - Additional client options
+   */
+  updateClientConfig(
+    options: Partial<ConstructorParameters<typeof GraphQLClient>[1]>,
+  ): void {
+    // For runtime configuration updates if needed
+    Object.assign(this.graphqlClient, options);
+    this.logger.log('Updated GraphQL client configuration');
+  }
+}

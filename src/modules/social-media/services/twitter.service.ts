@@ -381,7 +381,7 @@ export class TwitterService {
    * @returns Promise<SocialPostDto[]> - Array of recent tweets mapped to SocialPostDto
    */
   async getRecentTweets(twitterHandle: string): Promise<SocialPostDto[]> {
-    if (!twitterHandle || twitterHandle.trim() === '') {
+    if (!this.isValidTwitterHandle(twitterHandle)) {
       this.logger.warn('Empty or invalid Twitter handle provided');
       return [];
     }
@@ -481,6 +481,24 @@ export class TwitterService {
       `Successfully fetched ${socialPosts.length} tweets for ${cleanHandle}`,
     );
     return socialPosts;
+  }
+
+  /**
+   * Validates if a Twitter handle is properly formatted and not empty.
+   *
+   * @param handle - The Twitter handle to validate
+   * @returns boolean indicating if the handle is valid
+   */
+  isValidTwitterHandle(handle: string | null | undefined): boolean {
+    if (!handle) return false;
+
+    const trimmed = handle.trim();
+    if (trimmed.length === 0) return false;
+
+    // Basic validation - handle should not contain spaces or special chars
+    // (except @ which will be cleaned by cleanTwitterHandle)
+    const validHandleRegex = /^@?[A-Za-z0-9_]+$/;
+    return validHandleRegex.test(trimmed);
   }
 
   /**
@@ -585,8 +603,17 @@ export class TwitterService {
       return [];
     }
 
-    // Clean all handles first
-    const cleanHandles = twitterHandles.map(handle =>
+    // Filter and clean valid handles
+    const validHandles = twitterHandles.filter(handle =>
+      this.isValidTwitterHandle(handle),
+    );
+    if (validHandles.length < twitterHandles.length) {
+      this.logger.warn(
+        `Filtered out ${twitterHandles.length - validHandles.length} invalid Twitter handles`,
+      );
+    }
+
+    const cleanHandles = validHandles.map(handle =>
       this.cleanTwitterHandle(handle),
     );
 
@@ -822,7 +849,7 @@ export class TwitterService {
     twitterHandle: string,
     sinceTimestamp?: Date,
   ): Promise<SocialPostDto[]> {
-    if (!twitterHandle || twitterHandle.trim() === '') {
+    if (!this.isValidTwitterHandle(twitterHandle)) {
       this.logger.warn('Empty or invalid Twitter handle provided');
       return [];
     }
@@ -967,8 +994,18 @@ export class TwitterService {
       return [];
     }
 
+    // Filter out accounts with invalid handles
+    const validAccountsData = accountsData.filter(({ handle }) =>
+      this.isValidTwitterHandle(handle),
+    );
+    if (validAccountsData.length < accountsData.length) {
+      this.logger.warn(
+        `Filtered out ${accountsData.length - validAccountsData.length} accounts with invalid Twitter handles`,
+      );
+    }
+
     this.logger.log(
-      `Starting incremental batch fetch for ${accountsData.length} handles`,
+      `Starting incremental batch fetch for ${validAccountsData.length} handles`,
     );
 
     // Ensure we're authenticated before starting
@@ -978,7 +1015,7 @@ export class TwitterService {
       this.logger.warn(
         'Cannot fetch tweets: Not authenticated. Returning empty results for all handles.',
       );
-      return accountsData.map(({ handle }) => ({
+      return validAccountsData.map(({ handle }) => ({
         handle: this.cleanTwitterHandle(handle),
         posts: [],
         success: false,
@@ -988,12 +1025,12 @@ export class TwitterService {
 
     const results: HandleResult[] = [];
 
-    for (let i = 0; i < accountsData.length; i++) {
-      const { handle, sinceTimestamp } = accountsData[i];
+    for (let i = 0; i < validAccountsData.length; i++) {
+      const { handle, sinceTimestamp } = validAccountsData[i];
       const cleanHandle = this.cleanTwitterHandle(handle);
 
       this.logger.log(
-        `Processing handle ${i + 1}/${accountsData.length}: ${cleanHandle}${sinceTimestamp ? ` (since ${sinceTimestamp.toISOString()})` : ''}`,
+        `Processing handle ${i + 1}/${validAccountsData.length}: ${cleanHandle}${sinceTimestamp ? ` (since ${sinceTimestamp.toISOString()})` : ''}`,
       );
 
       try {
@@ -1034,7 +1071,7 @@ export class TwitterService {
 
     const successCount = results.filter(r => r.success).length;
     this.logger.log(
-      `Incremental batch fetch completed: ${successCount}/${accountsData.length} handles successful`,
+      `Incremental batch fetch completed: ${successCount}/${validAccountsData.length} handles successful`,
     );
 
     return results;

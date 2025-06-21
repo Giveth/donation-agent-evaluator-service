@@ -22,13 +22,13 @@ export class ErrorResponseDto {
 
   /**
    * Request path where the error occurred
-   * @example "/evaluation/cause"
+   * @example "/evaluation/projects"
    */
   path: string;
 
   /**
    * Optional additional error details
-   * @example "Field 'causeId' is required"
+   * @example "Field 'projectId' is required"
    */
   details?: string;
 

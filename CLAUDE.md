@@ -83,6 +83,9 @@ TWITTER_MAX_DELAY_MS=8000
 TWITTER_MAX_RETRIES=3
 TWITTER_BASE_RETRY_DELAY_MS=5000
 
+# Farcaster Integration (FREE - No API Keys Required)
+# Uses FName Registry and Warpcast APIs - completely free
+
 # LLM Integration (OpenRouter)
 OPENROUTER_API_KEY=your_openrouter_key
 LLM_MODEL=google/gemini-2.5-flash-preview
@@ -103,6 +106,17 @@ GIVETH_API_KEY=your_giveth_key
 - **Caching**: 6-hour TTL for social media data
 - **Authentication Management**: Automatic fallback and cookie persistence
 
+### FarcasterService Features
+
+- **Username to FID Resolution**: Uses FREE FName Registry API to resolve usernames to Farcaster IDs (no API keys required)
+- **Username Transfer Handling**: Properly handles username ownership changes by finding latest active transfer
+- **Cast Fetching**: Uses Warpcast client API to fetch user casts  
+- **Intelligent Caching**: 24-hour TTL for FIDs, 1-hour TTL for casts
+- **Rate Limiting**: Randomized delays between requests (2-3 second range)
+- **Incremental Fetching**: Optimized for scheduled jobs to avoid re-processing old data
+- **Batch Processing**: Client-side filtering with configurable limits
+- **Completely FREE**: No API keys required for any Farcaster functionality
+
 ### Data Flow
 
 1. Receive evaluation request with `causeId`
@@ -122,11 +136,14 @@ GIVETH_API_KEY=your_giveth_key
 
 ## Development Guidelines
 
-### Running Tests for TwitterService
+### Running Tests for Social Media Services
 
 ```bash
 # Test TwitterService authentication and functionality
 npx ts-node test-twitter-elonmusk.ts
+
+# Test FarcasterService with FName Registry API (FREE)
+npx ts-node run-farcaster-test.ts
 ```
 
 ### Module Dependencies

@@ -13,6 +13,7 @@ import { FarcasterService } from '../../social-media/services/farcaster.service'
 import { SocialPostStorageService } from '../../social-media-storage/services/social-post-storage.service';
 import { ProjectSocialAccountService } from '../../social-media-storage/services/project-social-account.service';
 import { TwitterFetchProcessor } from '../processors/twitter-fetch.processor';
+import { FarcasterFetchProcessor } from '../processors/farcaster-fetch.processor';
 import { ProjectSyncProcessor } from '../processors/project-sync.processor';
 
 /**
@@ -58,6 +59,7 @@ export class JobProcessorService {
     private readonly projectSocialAccountService: ProjectSocialAccountService,
     private readonly configService: ConfigService,
     private readonly twitterFetchProcessor: TwitterFetchProcessor,
+    private readonly farcasterFetchProcessor: FarcasterFetchProcessor,
     private readonly projectSyncProcessor: ProjectSyncProcessor,
   ) {
     // Initialize configuration with defaults
@@ -316,79 +318,19 @@ export class JobProcessorService {
   }
 
   /**
-   * Processes a Farcaster fetch job.
+   * Processes a Farcaster fetch job using the dedicated FarcasterFetchProcessor.
    *
    * @param job - The Farcaster fetch job to process
    * @returns Promise<boolean> - True if successful, false if failed
    */
   private async processFarcasterFetchJob(job: ScheduledJob): Promise<boolean> {
     try {
-      // Get project's social media account information
-      const projectAccount =
-        await this.projectSocialAccountService.getProjectAccount(job.projectId);
-
-      if (!projectAccount?.farcasterUsername) {
-        this.logger.warn(
-          `No Farcaster username found for project ${job.projectId}`,
-        );
-        return false;
-      }
-
-      // Get the latest Farcaster post timestamp for incremental fetching
-      const sinceTimestamp = projectAccount.latestFarcasterPostTimestamp;
-
-      this.logger.debug(
-        `Fetching Farcaster casts for username ${projectAccount.farcasterUsername} since ${sinceTimestamp?.toISOString() ?? 'beginning'}`,
-      );
-
-      // Fetch recent casts (FarcasterService not yet fully implemented)
-      let casts;
-      try {
-        // Check if method exists before calling
-        if (
-          typeof (this.farcasterService as any).getRecentCasts === 'function'
-        ) {
-          casts = await (this.farcasterService as any).getRecentCasts(
-            projectAccount.farcasterUsername,
-          );
-        } else {
-          this.logger.warn(
-            `FarcasterService.getRecentCasts not yet implemented, skipping project ${job.projectId}`,
-          );
-          return true; // Consider as success since the service isn't ready
-        }
-      } catch (error) {
-        this.logger.error(
-          `Failed to fetch Farcaster casts for ${projectAccount.farcasterUsername}:`,
-          error,
-        );
-        return false;
-      }
-
-      if (!Array.isArray(casts) || casts.length === 0) {
-        this.logger.debug(`No new casts found for project ${job.projectId}`);
-        return true; // No new casts is considered a success
-      }
-
-      // Store the fetched casts in the database
-      const storageResult =
-        await this.socialPostStorageService.storeSocialPostsIncremental(
-          job.projectId,
-          casts,
-        );
-
-      this.logger.debug(
-        `Stored ${storageResult.stored} new casts for project ${job.projectId}`,
-        {
-          duplicatesFound: storageResult.duplicatesFound,
-          stoppedAtTimestamp: storageResult.stoppedAtTimestamp?.toISOString(),
-        },
-      );
-
+      // Use the dedicated FarcasterFetchProcessor for comprehensive Farcaster fetch handling
+      await this.farcasterFetchProcessor.processFarcasterFetch(job);
       return true;
     } catch (error) {
       this.logger.error(
-        `Failed to process Farcaster fetch job for project ${job.projectId}:`,
+        `FarcasterFetchProcessor failed for project ${job.projectId}:`,
         error,
       );
       return false;

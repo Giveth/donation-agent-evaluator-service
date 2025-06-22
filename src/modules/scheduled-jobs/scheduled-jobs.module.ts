@@ -7,6 +7,7 @@ import { ScheduledJob } from '../social-media-storage/entities/scheduled-job.ent
 import { JobSchedulerService } from './services/job-scheduler.service';
 import { JobProcessorService } from './services/job-processor.service';
 import { TwitterFetchProcessor } from './processors/twitter-fetch.processor';
+import { FarcasterFetchProcessor } from './processors/farcaster-fetch.processor';
 import { ProjectSyncProcessor } from './processors/project-sync.processor';
 
 @Module({
@@ -20,12 +21,14 @@ import { ProjectSyncProcessor } from './processors/project-sync.processor';
     JobSchedulerService,
     JobProcessorService,
     TwitterFetchProcessor,
+    FarcasterFetchProcessor,
     ProjectSyncProcessor,
   ],
   exports: [
     JobSchedulerService,
     JobProcessorService,
     TwitterFetchProcessor,
+    FarcasterFetchProcessor,
     ProjectSyncProcessor,
   ],
 })

@@ -100,7 +100,7 @@ export class JobSchedulerService {
     try {
       this.logger.log('Fetching projects with Farcaster usernames...');
       const projectsWithFarcaster =
-        await this.projectSocialAccountService.getProjectsWithFarcasterUsernames();
+        await this.projectSocialAccountService.getFarcasterProjects();
 
       if (projectsWithFarcaster.length === 0) {
         this.logger.log('No projects with Farcaster usernames found');
@@ -286,7 +286,7 @@ export class JobSchedulerService {
     try {
       const [twitterProjects, farcasterProjects] = await Promise.all([
         this.projectSocialAccountService.getProjectsWithTwitterHandles(),
-        this.projectSocialAccountService.getProjectsWithFarcasterUsernames(),
+        this.projectSocialAccountService.getFarcasterProjects(),
       ]);
 
       const [twitterJobs, farcasterJobs] = await Promise.all([

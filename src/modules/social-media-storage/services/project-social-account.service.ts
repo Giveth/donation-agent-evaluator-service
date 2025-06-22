@@ -162,23 +162,6 @@ export class ProjectSocialAccountService {
     }
   }
 
-  async getProjectsWithFarcasterUsernames(): Promise<ProjectSocialAccount[]> {
-    try {
-      return await this.projectAccountRepository
-        .createQueryBuilder('account')
-        .where(
-          "account.farcasterUsername IS NOT NULL AND account.farcasterUsername != ''",
-        )
-        .getMany();
-    } catch (error) {
-      this.logger.error(
-        'Failed to get projects with Farcaster usernames:',
-        error,
-      );
-      throw error;
-    }
-  }
-
   async updateLastFetchTimestamp(
     projectId: string,
     platform: SocialMediaPlatform,
@@ -299,6 +282,140 @@ export class ProjectSocialAccountService {
   }
 
   /**
+   * Get projects with Farcaster usernames for efficient fetching statistics.
+   * This method is optimized for the FarcasterFetchProcessor statistics.
+   *
+   * @returns Promise<ProjectSocialAccount[]> - Projects with Farcaster usernames
+   */
+  async getFarcasterProjects(): Promise<ProjectSocialAccount[]> {
+    try {
+      return await this.projectAccountRepository
+        .createQueryBuilder('account')
+        .where(
+          "account.farcasterUsername IS NOT NULL AND account.farcasterUsername != ''",
+        )
+        .getMany();
+    } catch (error) {
+      this.logger.error('Failed to get Farcaster projects:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get projects with Farcaster usernames that were recently fetched.
+   * This method pushes all filtering logic to the database level for optimal performance.
+   *
+   * @param since - Only include projects fetched after this date
+   * @param projectId - Optional specific project ID to filter by
+   * @returns Promise<ProjectSocialAccount[]> - Recently fetched Farcaster projects
+   */
+  async getRecentlyFetchedFarcasterProjects(
+    since: Date,
+    projectId?: string,
+  ): Promise<ProjectSocialAccount[]> {
+    try {
+      const queryBuilder = this.projectAccountRepository
+        .createQueryBuilder('account')
+        .where(
+          "account.farcasterUsername IS NOT NULL AND account.farcasterUsername != ''",
+        )
+        .andWhere('account.lastFarcasterFetch IS NOT NULL')
+        .andWhere('account.lastFarcasterFetch > :since', { since });
+
+      // Apply project filter if specified
+      if (projectId) {
+        queryBuilder.andWhere('account.projectId = :projectId', { projectId });
+      }
+
+      return await queryBuilder.getMany();
+    } catch (error) {
+      this.logger.error(
+        'Failed to get recently fetched Farcaster projects:',
+        error,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Get Farcaster fetch statistics using efficient database queries.
+   * This method provides the data needed for FarcasterFetchProcessor.getFetchStatistics()
+   * without loading all project data into memory.
+   *
+   * @param projectId - Optional specific project ID to get stats for
+   * @returns Promise<object> - Statistics about Farcaster fetching
+   */
+  async getFarcasterFetchStatistics(projectId?: string): Promise<{
+    totalProjects: number;
+    projectsWithFarcaster: number;
+    recentFetches: number;
+    lastFetchTime?: Date;
+  }> {
+    try {
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+      // Build base queries
+      let totalQuery =
+        this.projectAccountRepository.createQueryBuilder('account');
+      let farcasterQuery = this.projectAccountRepository
+        .createQueryBuilder('account')
+        .where(
+          "account.farcasterUsername IS NOT NULL AND account.farcasterUsername != ''",
+        );
+      let recentFetchesQuery = this.projectAccountRepository
+        .createQueryBuilder('account')
+        .where(
+          "account.farcasterUsername IS NOT NULL AND account.farcasterUsername != ''",
+        )
+        .andWhere('account.lastFarcasterFetch >= :oneDayAgo', { oneDayAgo });
+
+      // Apply project filter if specified
+      if (projectId) {
+        totalQuery = totalQuery.where('account.projectId = :projectId', {
+          projectId,
+        });
+        farcasterQuery = farcasterQuery.andWhere(
+          'account.projectId = :projectId',
+          { projectId },
+        );
+        recentFetchesQuery = recentFetchesQuery.andWhere(
+          'account.projectId = :projectId',
+          { projectId },
+        );
+      }
+
+      // Execute counts in parallel
+      const [totalProjects, projectsWithFarcaster, recentFetches] =
+        await Promise.all([
+          totalQuery.getCount(),
+          farcasterQuery.getCount(),
+          recentFetchesQuery.getCount(),
+        ]);
+
+      // Get the most recent fetch time
+      const lastFetchResult = await this.projectAccountRepository
+        .createQueryBuilder('account')
+        .where(
+          "account.farcasterUsername IS NOT NULL AND account.farcasterUsername != ''",
+        )
+        .andWhere('account.lastFarcasterFetch IS NOT NULL')
+        .orderBy('account.lastFarcasterFetch', 'DESC')
+        .limit(1)
+        .getOne();
+
+      return {
+        totalProjects,
+        projectsWithFarcaster,
+        recentFetches,
+        lastFetchTime: lastFetchResult?.lastFarcasterFetch,
+      };
+    } catch (error) {
+      this.logger.error('Failed to get Farcaster fetch statistics:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Helper method to update project account fields
    */
   private updateProjectAccountFields(
@@ -380,15 +497,15 @@ export class ProjectSocialAccountService {
     data: ProjectAccountData,
   ): Partial<ProjectSocialAccount> {
     return {
-      title: data.title || '',
-      slug: data.slug || '',
+      title: data.title ?? '',
+      slug: data.slug ?? '',
       description: data.description,
-      projectStatus: data.projectStatus || 'UNKNOWN',
-      verified: data.verified || false,
+      projectStatus: data.projectStatus ?? 'UNKNOWN',
+      verified: data.verified ?? false,
       qualityScore: data.qualityScore,
       givPowerRank: data.givPowerRank,
-      totalDonations: data.totalDonations || 0,
-      totalReactions: data.totalReactions || 0,
+      totalDonations: data.totalDonations ?? 0,
+      totalReactions: data.totalReactions ?? 0,
       lastUpdateDate: data.lastUpdateDate,
       lastUpdateContent: data.lastUpdateContent,
       twitterHandle: data.twitterHandle,

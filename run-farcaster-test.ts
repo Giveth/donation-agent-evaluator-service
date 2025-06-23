@@ -137,6 +137,151 @@ async function testFarcasterService() {
     console.log(
       `⏱️  Completed in ${endTime - startTime}ms (should be much faster)`,
     );
+
+    // --- Test 4: Batch Operation Benchmarking ---
+    console.log('\n\n--- Test 4: Batch Operation Benchmarking ---');
+    console.log('─'.repeat(40));
+
+    const batchTestAccounts = ['dwr.eth', 'vitalik.eth', 'jessepollak'];
+    console.log(
+      `\n▶️ Testing batch operations for: ${batchTestAccounts.join(', ')}`,
+    );
+
+    // Sequential processing benchmark
+    console.log('\n  📊 Sequential Processing Benchmark:');
+    const sequentialStartTime = Date.now();
+    const sequentialResults: Array<{
+      username: string;
+      postCount: number;
+      duration: number;
+    }> = [];
+    for (const username of batchTestAccounts) {
+      const accountStartTime = Date.now();
+      const posts = await farcasterService.getRecentCasts(username);
+      const accountEndTime = Date.now();
+      sequentialResults.push({
+        username,
+        postCount: posts.length,
+        duration: accountEndTime - accountStartTime,
+      });
+      console.log(
+        `    ${username}: ${posts.length} posts in ${accountEndTime - accountStartTime}ms`,
+      );
+    }
+    const sequentialTotalTime = Date.now() - sequentialStartTime;
+    console.log(`  📈 Sequential Total: ${sequentialTotalTime}ms`);
+
+    // Parallel processing benchmark
+    console.log('\n  🚀 Parallel Processing Benchmark:');
+    const parallelStartTime = Date.now();
+    const parallelPromises = batchTestAccounts.map(async username => {
+      const accountStartTime = Date.now();
+      const posts = await farcasterService.getRecentCasts(username);
+      const accountEndTime = Date.now();
+      return {
+        username,
+        postCount: posts.length,
+        duration: accountEndTime - accountStartTime,
+      };
+    });
+
+    const parallelResults = await Promise.all(parallelPromises);
+    const parallelTotalTime = Date.now() - parallelStartTime;
+
+    parallelResults.forEach(result => {
+      console.log(
+        `    ${result.username}: ${result.postCount} posts in ${result.duration}ms`,
+      );
+    });
+    console.log(`  📈 Parallel Total: ${parallelTotalTime}ms`);
+
+    // Performance comparison
+    console.log('\n  📊 Performance Comparison:');
+    const timeReduction = sequentialTotalTime - parallelTotalTime;
+    const percentageImprovement = (
+      (timeReduction / sequentialTotalTime) *
+      100
+    ).toFixed(1);
+    console.log(`    Sequential: ${sequentialTotalTime}ms`);
+    console.log(`    Parallel:   ${parallelTotalTime}ms`);
+    console.log(
+      `    Reduction:  ${timeReduction}ms (${percentageImprovement}% faster)`,
+    );
+
+    // Batch FID lookup benchmark
+    console.log('\n  🔍 Batch FID Lookup Benchmark:');
+    const fidBenchmarkAccounts = [
+      'dwr.eth',
+      'vitalik.eth',
+      'jessepollak',
+      'balajis.eth',
+    ];
+
+    // Sequential FID lookups
+    const fidSequentialStart = Date.now();
+    const fidSequentialResults: Array<{
+      username: string;
+      fid: any;
+      success: any;
+      fromCache: any;
+      duration: number;
+    }> = [];
+    for (const username of fidBenchmarkAccounts) {
+      const startTime = Date.now();
+      const fidResult = await farcasterService.getFidByUsername(username);
+      const endTime = Date.now();
+      fidSequentialResults.push({
+        username,
+        fid: fidResult.fid,
+        success: fidResult.success,
+        fromCache: fidResult.fromCache,
+        duration: endTime - startTime,
+      });
+    }
+    const fidSequentialTotal = Date.now() - fidSequentialStart;
+
+    // Parallel FID lookups
+    const fidParallelStart = Date.now();
+    const fidParallelPromises = fidBenchmarkAccounts.map(async username => {
+      const startTime = Date.now();
+      const fidResult = await farcasterService.getFidByUsername(username);
+      const endTime = Date.now();
+      return {
+        username,
+        fid: fidResult.fid,
+        success: fidResult.success,
+        fromCache: fidResult.fromCache,
+        duration: endTime - startTime,
+      };
+    });
+
+    const fidParallelResults = await Promise.all(fidParallelPromises);
+    const fidParallelTotal = Date.now() - fidParallelStart;
+
+    console.log('    Sequential FID Lookups:');
+    fidSequentialResults.forEach(result => {
+      console.log(
+        `      ${result.username}: FID ${result.fid} in ${result.duration}ms (cache: ${result.fromCache})`,
+      );
+    });
+    console.log(`    Sequential Total: ${fidSequentialTotal}ms`);
+
+    console.log('    Parallel FID Lookups:');
+    fidParallelResults.forEach(result => {
+      console.log(
+        `      ${result.username}: FID ${result.fid} in ${result.duration}ms (cache: ${result.fromCache})`,
+      );
+    });
+    console.log(`    Parallel Total: ${fidParallelTotal}ms`);
+
+    const fidTimeReduction = fidSequentialTotal - fidParallelTotal;
+    const fidPercentageImprovement = (
+      (fidTimeReduction / fidSequentialTotal) *
+      100
+    ).toFixed(1);
+    console.log(
+      `    FID Lookup Improvement: ${fidTimeReduction}ms (${fidPercentageImprovement}% faster)`,
+    );
   } catch (error) {
     console.error('\n❌ Test failed with an unexpected error:');
     if (error instanceof Error) {

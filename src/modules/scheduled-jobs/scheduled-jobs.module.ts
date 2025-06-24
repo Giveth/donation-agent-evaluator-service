@@ -9,6 +9,7 @@ import { JobProcessorService } from './services/job-processor.service';
 import { TwitterFetchProcessor } from './processors/twitter-fetch.processor';
 import { FarcasterFetchProcessor } from './processors/farcaster-fetch.processor';
 import { ProjectSyncProcessor } from './processors/project-sync.processor';
+import { AdminController } from './controllers/admin.controller';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { ProjectSyncProcessor } from './processors/project-sync.processor';
     SocialMediaModule,
     DataFetchingModule,
   ],
+  controllers: [AdminController],
   providers: [
     JobSchedulerService,
     JobProcessorService,

@@ -13,6 +13,7 @@ import { SocialMediaModule } from './modules/social-media/social-media.module';
 import { SocialMediaStorageModule } from './modules/social-media-storage/social-media-storage.module';
 import { ScheduledJobsModule } from './modules/scheduled-jobs/scheduled-jobs.module';
 import { DataFetchingModule } from './modules/data-fetching/data-fetching.module';
+import { EvaluationModule } from './modules/evaluation/evaluation.module';
 
 @Module({
   imports: [
@@ -117,6 +118,7 @@ import { DataFetchingModule } from './modules/data-fetching/data-fetching.module
     SocialMediaStorageModule,
     ScheduledJobsModule,
     DataFetchingModule,
+    EvaluationModule,
   ],
   controllers: [AppController],
   providers: [AppService],

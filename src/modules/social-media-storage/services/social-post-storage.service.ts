@@ -535,4 +535,63 @@ export class SocialPostStorageService {
       throw error;
     }
   }
+
+  /**
+   * Get post count by platform for statistics
+   *
+   * @param platform - The social media platform
+   * @returns Promise<number> - Count of posts for the platform
+   */
+  async getPostCountByPlatform(platform: SocialMediaPlatform): Promise<number> {
+    try {
+      return await this.storedSocialPostRepository
+        .createQueryBuilder('post')
+        .where("post.metadata->>'platform' = :platform", { platform })
+        .getCount();
+    } catch (error) {
+      this.logger.error(
+        `Failed to get post count for platform ${platform}:`,
+        error,
+      );
+      return 0;
+    }
+  }
+
+  /**
+   * Get recent post counts for statistics
+   *
+   * @returns Promise<object> - Counts of posts in different time periods
+   */
+  async getRecentPostCounts(): Promise<{
+    last24Hours: number;
+    last7Days: number;
+  }> {
+    try {
+      const now = new Date();
+      const last24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+      const [count24h, count7d] = await Promise.all([
+        this.storedSocialPostRepository
+          .createQueryBuilder('post')
+          .where('post.fetchedAt >= :since', { since: last24Hours })
+          .getCount(),
+        this.storedSocialPostRepository
+          .createQueryBuilder('post')
+          .where('post.fetchedAt >= :since', { since: last7Days })
+          .getCount(),
+      ]);
+
+      return {
+        last24Hours: count24h,
+        last7Days: count7d,
+      };
+    } catch (error) {
+      this.logger.error('Failed to get recent post counts:', error);
+      return {
+        last24Hours: 0,
+        last7Days: 0,
+      };
+    }
+  }
 }

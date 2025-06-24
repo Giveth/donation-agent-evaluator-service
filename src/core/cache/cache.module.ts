@@ -1,11 +1,16 @@
 import { Module } from '@nestjs/common';
 import { CacheModule as NestCacheModule } from '@nestjs/cache-manager';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 
 @Module({
   imports: [
-    NestCacheModule.register({
-      isGlobal: true,
-      ttl: 3600, // 1 hour default TTL in seconds
+    NestCacheModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        isGlobal: true,
+        ttl: parseInt(configService.get('CACHE_TTL_DEFAULT', '3600'), 10), // Default 1 hour TTL in seconds
+      }),
     }),
   ],
   exports: [NestCacheModule],

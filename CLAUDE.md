@@ -88,7 +88,7 @@ TWITTER_BASE_RETRY_DELAY_MS=5000
 
 # LLM Integration (OpenRouter)
 OPENROUTER_API_KEY=your_openrouter_key
-LLM_MODEL=google/gemini-2.5-flash-preview
+LLM_MODEL=google/gemini-2.5-flash
 
 # Giveth Backend Integration
 GIVETH_API_BASE_URL=https://api.giveth.io
@@ -110,7 +110,7 @@ GIVETH_API_KEY=your_giveth_key
 
 - **Username to FID Resolution**: Uses FREE FName Registry API to resolve usernames to Farcaster IDs (no API keys required)
 - **Username Transfer Handling**: Properly handles username ownership changes by finding latest active transfer
-- **Cast Fetching**: Uses Warpcast client API to fetch user casts  
+- **Cast Fetching**: Uses Warpcast client API to fetch user casts
 - **Intelligent Caching**: 24-hour TTL for FIDs, 1-hour TTL for casts
 - **Rate Limiting**: Randomized delays between requests (2-3 second range)
 - **Incremental Fetching**: Optimized for scheduled jobs to avoid re-processing old data

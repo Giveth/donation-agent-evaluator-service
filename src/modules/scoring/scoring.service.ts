@@ -318,27 +318,31 @@ Respond in JSON format:
     try {
       // Check if custom weight percentages are provided in config
       const percentages = {
-        projectInfoQuality: this.configService.get<number>(
-          'SCORING_WEIGHT_PROJECT_INFO_QUALITY',
-        ),
-        updateRecency: this.configService.get<number>(
-          'SCORING_WEIGHT_UPDATE_RECENCY',
-        ),
-        socialMediaQuality: this.configService.get<number>(
-          'SCORING_WEIGHT_SOCIAL_MEDIA_QUALITY',
-        ),
-        socialMediaRecency: this.configService.get<number>(
-          'SCORING_WEIGHT_SOCIAL_MEDIA_RECENCY',
-        ),
-        socialMediaFrequency: this.configService.get<number>(
-          'SCORING_WEIGHT_SOCIAL_MEDIA_FREQUENCY',
-        ),
-        relevanceToCause: this.configService.get<number>(
-          'SCORING_WEIGHT_RELEVANCE_TO_CAUSE',
-        ),
-        givPowerRank: this.configService.get<number>(
-          'SCORING_WEIGHT_GIVPOWER_RANK',
-        ),
+        projectInfoQuality:
+          Number(
+            this.configService.get('SCORING_WEIGHT_PROJECT_INFO_QUALITY'),
+          ) || undefined,
+        updateRecency:
+          Number(this.configService.get('SCORING_WEIGHT_UPDATE_RECENCY')) ||
+          undefined,
+        socialMediaQuality:
+          Number(
+            this.configService.get('SCORING_WEIGHT_SOCIAL_MEDIA_QUALITY'),
+          ) || undefined,
+        socialMediaRecency:
+          Number(
+            this.configService.get('SCORING_WEIGHT_SOCIAL_MEDIA_RECENCY'),
+          ) || undefined,
+        socialMediaFrequency:
+          Number(
+            this.configService.get('SCORING_WEIGHT_SOCIAL_MEDIA_FREQUENCY'),
+          ) || undefined,
+        relevanceToCause:
+          Number(this.configService.get('SCORING_WEIGHT_RELEVANCE_TO_CAUSE')) ||
+          undefined,
+        givPowerRank:
+          Number(this.configService.get('SCORING_WEIGHT_GIVPOWER_RANK')) ||
+          undefined,
       };
 
       // If any custom percentages are provided, create weights from percentages

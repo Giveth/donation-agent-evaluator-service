@@ -1,7 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { CauseScoreBreakdownDto } from '../evaluation/dto/scored-project.dto';
-import { ScoringInputDto, ScoringWeightsDto, LLMAssessmentDto } from './dto';
+import {
+  ScoringInputDto,
+  ScoringWeightsDto,
+  LLMAssessmentDto,
+  CauseScoreBreakdownDto,
+} from './dto';
 import { LLMService } from '../llm-integration/llm.service';
 import { SocialPostDto } from '../social-media/dto/social-post.dto';
 

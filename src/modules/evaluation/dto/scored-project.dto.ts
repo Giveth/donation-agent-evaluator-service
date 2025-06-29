@@ -1,12 +1,4 @@
-export interface CauseScoreBreakdownDto {
-  projectInfoQualityScore: number;
-  updateRecencyScore: number;
-  socialMediaQualityScore: number;
-  socialMediaRecencyScore: number;
-  socialMediaFrequencyScore: number;
-  relevanceToCauseScore: number;
-  givPowerRankScore: number;
-}
+import { CauseScoreBreakdownDto } from '../../scoring/dto';
 
 export class ScoredProjectDto {
   projectId: string;

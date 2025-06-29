@@ -10,7 +10,7 @@ import {
 import { ScoredProjectDto } from './dto/scored-project.dto';
 import { EvaluationResultDto } from './dto/evaluation-result.dto';
 import { ScoringService } from '../scoring/scoring.service';
-import { ScoringInputDto } from '../scoring/dto';
+import { ProjectScoreInputsDto } from '../scoring/dto';
 
 @Injectable()
 export class EvaluationService {
@@ -137,7 +137,7 @@ export class EvaluationService {
     );
 
     // Prepare scoring input
-    const scoringInput = new ScoringInputDto({
+    const scoringInput = new ProjectScoreInputsDto({
       projectId: project.id.toString(),
       projectTitle: project.title,
       projectDescription: project.description,
@@ -154,12 +154,12 @@ export class EvaluationService {
     });
 
     // Calculate scores using the scoring service
-    const { causeScore, breakdown } =
+    const { finalScore, breakdown } =
       await this.scoringService.calculateCauseScore(scoringInput);
 
     return {
       projectId: project.id.toString(),
-      causeScore,
+      causeScore: finalScore,
       scoreBreakdown: breakdown,
       hasStoredPosts,
       totalStoredPosts: allSocialPosts.length,

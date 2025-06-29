@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   ScoringInputDto,
+  ProjectScoreInputsDto,
   ScoringWeightsDto,
   LLMAssessmentDto,
   CauseScoreBreakdownDto,
@@ -56,8 +57,23 @@ export class ScoringService {
 
   /**
    * Calculate the complete cause score for a project
+   * Uses ProjectScoreInputsDto and returns finalScore
    */
-  async calculateCauseScore(input: ScoringInputDto): Promise<{
+  async calculateCauseScore(inputs: ProjectScoreInputsDto): Promise<{
+    finalScore: number;
+    breakdown: CauseScoreBreakdownDto;
+  }> {
+    const result = await this.calculateCauseScoreInternal(inputs);
+    return {
+      finalScore: result.causeScore,
+      breakdown: result.breakdown,
+    };
+  }
+
+  /**
+   * Internal method for calculating cause score (backward compatibility)
+   */
+  private async calculateCauseScoreInternal(input: ScoringInputDto): Promise<{
     causeScore: number;
     breakdown: CauseScoreBreakdownDto;
   }> {

@@ -6,7 +6,6 @@ import { ScoringInputDto } from './scoring-input.dto';
  * relevant fields from ProjectDetailsDto, CauseDetailsDto, and SocialPostDto[].
  *
  * Note: This is an alias for ScoringInputDto to maintain naming consistency
- * with the task specifications while preserving existing functionality.
  */
 export class ProjectScoreInputsDto extends ScoringInputDto {
   constructor(data: Partial<ProjectScoreInputsDto>) {

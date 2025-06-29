@@ -43,7 +43,7 @@ const LOCK_TIMEOUT_MS = 6 * 60 * 60 * 1000; // 6 hours max
  * - Extracts and stores complete project metadata including social media handles
  * - Updates project status, verification info, quality scores, and power rankings
  * - Comprehensive progress tracking and error handling
- * - Scheduled to run every 6 hours as per Task 6.9 requirements
+ * - Scheduled to run every 6 hours as per requirements
  *
  * The processor follows the architecture defined in the scheduled jobs system
  * and integrates with ProjectSocialAccountService for data persistence.
@@ -60,7 +60,6 @@ export class ProjectSyncProcessor {
 
   /**
    * Scheduled cron job that runs every 6 hours to sync project data
-   * This implements the main requirement from Task 6.9
    */
   @Cron('0 */6 * * *', {
     name: 'project-sync-scheduled',

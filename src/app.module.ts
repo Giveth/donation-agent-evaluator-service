@@ -15,6 +15,7 @@ import { ScheduledJobsModule } from './modules/scheduled-jobs/scheduled-jobs.mod
 import { DataFetchingModule } from './modules/data-fetching/data-fetching.module';
 import { EvaluationModule } from './modules/evaluation/evaluation.module';
 import { LLMIntegrationModule } from './modules/llm-integration/llm-integration.module';
+import { ScoringModule } from './modules/scoring/scoring.module';
 
 @Module({
   imports: [
@@ -120,6 +121,7 @@ import { LLMIntegrationModule } from './modules/llm-integration/llm-integration.
     ScheduledJobsModule,
     DataFetchingModule,
     LLMIntegrationModule,
+    ScoringModule,
     EvaluationModule,
   ],
   controllers: [AppController],

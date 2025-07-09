@@ -315,6 +315,13 @@ export class ProjectDetailsDto {
   slug!: string;
 
   /**
+   * Project type (project or cause)
+   */
+  @IsOptional()
+  @IsString()
+  projectType?: string;
+
+  /**
    * Full project description
    */
   @IsString()
@@ -600,6 +607,7 @@ export class ProjectDetailsDto {
     id: number;
     title: string;
     slug: string;
+    projectType?: string;
     description: string;
     descriptionSummary?: string;
     website?: string;
@@ -640,6 +648,7 @@ export class ProjectDetailsDto {
     this.id = data.id;
     this.title = data.title;
     this.slug = data.slug;
+    this.projectType = data.projectType;
     this.description = data.description;
     this.descriptionSummary = data.descriptionSummary;
     this.website = data.website;
@@ -777,6 +786,7 @@ export function createProjectDetailsDto(project: unknown): ProjectDetailsDto {
     id: proj.id,
     title: proj.title,
     slug: proj.slug,
+    projectType: proj.projectType,
     description: proj.description,
     descriptionSummary: proj.descriptionSummary,
     website: proj.website,

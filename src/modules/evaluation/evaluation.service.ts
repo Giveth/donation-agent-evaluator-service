@@ -7,11 +7,10 @@ import {
   CauseDto,
   EvaluateProjectsRequestDto,
 } from './dto/evaluate-projects-request.dto';
-import {
-  ScoredProjectDto,
-  CauseScoreBreakdownDto,
-} from './dto/scored-project.dto';
+import { ScoredProjectDto } from './dto/scored-project.dto';
 import { EvaluationResultDto } from './dto/evaluation-result.dto';
+import { ScoringService } from '../scoring/scoring.service';
+import { ProjectScoreInputsDto } from '../scoring/dto';
 
 @Injectable()
 export class EvaluationService {
@@ -20,8 +19,7 @@ export class EvaluationService {
   constructor(
     private readonly dataFetchingService: DataFetchingService,
     private readonly socialPostStorageService: SocialPostStorageService,
-    // TODO: Inject LLMService when Phase 8 is implemented
-    // TODO: Inject ScoringService when Phase 9 is implemented
+    private readonly scoringService: ScoringService,
   ) {}
 
   /**
@@ -94,7 +92,7 @@ export class EvaluationService {
    */
   private async evaluateProject(
     project: ProjectDetailsDto,
-    _cause: CauseDto,
+    cause: CauseDto,
   ): Promise<ScoredProjectDto> {
     this.logger.debug(`Evaluating project ${project.id} (${project.title})`);
 
@@ -138,44 +136,31 @@ export class EvaluationService {
       `Project ${project.id}: Found ${twitterPosts.length} Twitter posts, ${farcasterPosts.length} Farcaster posts`,
     );
 
-    // TODO: When LLMIntegrationModule is implemented (Phase 8), add:
-    // - LLM assessment of project description and update quality
-    // - LLM assessment of social media content quality
-    // - LLM assessment of relevance to cause
+    // Prepare scoring input
+    const scoringInput = new ProjectScoreInputsDto({
+      projectId: project.id.toString(),
+      projectTitle: project.title,
+      projectDescription: project.description,
+      lastUpdateDate: project.lastUpdateDate,
+      lastUpdateContent: project.lastUpdateContent,
+      lastUpdateTitle: project.lastUpdateTitle,
+      socialPosts: allSocialPosts,
+      qualityScore: project.qualityScore,
+      givPowerRank: project.givPowerRank,
+      causeTitle: cause.title,
+      causeDescription: cause.description,
+      // Note: causeMainCategory and causeSubCategories would need to be fetched
+      // from the full cause details if needed for more accurate scoring
+    });
 
-    // TODO: When ScoringModule is implemented (Phase 9), add:
-    // - Calculated scoring based on rubric weights
-    // - Recency calculations for updates and social posts
-    // - Frequency calculations for social media activity
-    // - GIVpower rank scoring
-
-    // For now, provide basic placeholder scoring
-    const causeScore = this.calculatePlaceholderScore(
-      project,
-      twitterPosts.length,
-      farcasterPosts.length,
-      lastPostDate,
-    );
-
-    const scoreBreakdown: CauseScoreBreakdownDto = {
-      projectInfoQualityScore: 0, // TODO: LLM assessment
-      updateRecencyScore: this.calculateUpdateRecencyScore(
-        project.lastUpdateDate,
-      ),
-      socialMediaQualityScore: 0, // TODO: LLM assessment
-      socialMediaRecencyScore: this.calculateSocialRecencyScore(lastPostDate),
-      socialMediaFrequencyScore: this.calculateSocialFrequencyScore(
-        twitterPosts.length,
-        farcasterPosts.length,
-      ),
-      relevanceToCauseScore: 0, // TODO: LLM assessment
-      givPowerRankScore: this.calculateGivPowerScore(project.givPowerRank),
-    };
+    // Calculate scores using the scoring service
+    const { finalScore, breakdown } =
+      await this.scoringService.calculateCauseScore(scoringInput);
 
     return {
       projectId: project.id.toString(),
-      causeScore,
-      scoreBreakdown,
+      causeScore: finalScore,
+      scoreBreakdown: breakdown,
       hasStoredPosts,
       totalStoredPosts: allSocialPosts.length,
       lastPostDate,
@@ -189,101 +174,6 @@ export class EvaluationService {
   private isProjectEligible(status: string): boolean {
     const eligibleStatuses = ['active', 'verified', 'draft'];
     return eligibleStatuses.includes(status.toLowerCase());
-  }
-
-  /**
-   * Placeholder scoring until full LLM and Scoring modules are implemented
-   */
-  private calculatePlaceholderScore(
-    project: ProjectDetailsDto,
-    twitterPostsCount: number,
-    farcasterPostsCount: number,
-    lastPostDate?: Date,
-  ): number {
-    let score = 0;
-
-    // Basic scoring based on available data
-    if (project.qualityScore) {
-      score += Math.min(project.qualityScore * 10, 25); // Up to 25 points
-    }
-
-    if (project.givPowerRank) {
-      score += this.calculateGivPowerScore(project.givPowerRank);
-    }
-
-    score += this.calculateUpdateRecencyScore(project.lastUpdateDate);
-    score += this.calculateSocialRecencyScore(lastPostDate);
-    score += this.calculateSocialFrequencyScore(
-      twitterPostsCount,
-      farcasterPostsCount,
-    );
-
-    return Math.min(Math.round(score), 100);
-  }
-
-  /**
-   * Calculate score based on update recency (10% of total score)
-   */
-  private calculateUpdateRecencyScore(lastUpdateDate?: Date): number {
-    if (!lastUpdateDate) return 0;
-
-    const daysSinceUpdate = Math.floor(
-      (Date.now() - lastUpdateDate.getTime()) / (1000 * 60 * 60 * 24),
-    );
-
-    if (daysSinceUpdate <= 7) return 10;
-    if (daysSinceUpdate <= 30) return 7;
-    if (daysSinceUpdate <= 60) return 4;
-    if (daysSinceUpdate <= 90) return 2;
-    return 0;
-  }
-
-  /**
-   * Calculate score based on social media post recency (5% of total score)
-   */
-  private calculateSocialRecencyScore(lastPostDate?: Date): number {
-    if (!lastPostDate) return 0;
-
-    const daysSincePost = Math.floor(
-      (Date.now() - lastPostDate.getTime()) / (1000 * 60 * 60 * 24),
-    );
-
-    if (daysSincePost <= 3) return 5;
-    if (daysSincePost <= 7) return 3;
-    if (daysSincePost <= 30) return 1;
-    return 0;
-  }
-
-  /**
-   * Calculate score based on social media posting frequency (5% of total score)
-   */
-  private calculateSocialFrequencyScore(
-    twitterCount: number,
-    farcasterCount: number,
-  ): number {
-    const totalPosts = twitterCount + farcasterCount;
-
-    if (totalPosts >= 15) return 5;
-    if (totalPosts >= 10) return 4;
-    if (totalPosts >= 5) return 3;
-    if (totalPosts >= 1) return 2;
-    return 0;
-  }
-
-  /**
-   * Calculate score based on GIVpower rank (25% of total score)
-   */
-  private calculateGivPowerScore(givPowerRank?: number): number {
-    if (!givPowerRank) return 0;
-
-    // Assuming rank is 1-based (lower number = better rank)
-    // This is a placeholder formula - actual implementation depends on GIVpower rank definition
-    if (givPowerRank <= 10) return 25;
-    if (givPowerRank <= 50) return 20;
-    if (givPowerRank <= 100) return 15;
-    if (givPowerRank <= 500) return 10;
-    if (givPowerRank <= 1000) return 5;
-    return 2;
   }
 
   /**

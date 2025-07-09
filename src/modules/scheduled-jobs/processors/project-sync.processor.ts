@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
+import { DataSource, QueryRunner } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import { ImpactGraphService } from '../../data-fetching/services/impact-graph.service';
 import { ProjectSocialAccountService } from '../../social-media-storage/services/project-social-account.service';
@@ -90,8 +90,8 @@ export class ProjectSyncProcessor {
       );
     } catch (error) {
       this.logger.error('Scheduled project synchronization failed', {
-        error: error.message,
-        stack: error.stack,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
         correlationId,
       });
       // Don't throw - let the system continue running
@@ -143,8 +143,8 @@ export class ProjectSyncProcessor {
         `Project sync job failed (Job ID: ${job.id}), ` +
           `processing time: ${processingTime}ms`,
         {
-          error: error.message,
-          stack: error.stack,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
           correlationId,
           jobId: job.id,
         },
@@ -155,8 +155,8 @@ export class ProjectSyncProcessor {
         job.metadata.processingResult = {
           processingTimeMs: processingTime,
           success: false,
-          error: error.message,
-          stack: error.stack,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
           completedAt: new Date().toISOString(),
           correlationId,
         };
@@ -254,8 +254,9 @@ export class ProjectSyncProcessor {
                 this.logger.warn(
                   `Failed to sync project: ${project.title} (ID: ${project.id})`,
                   {
-                    error: error.message,
-                    stack: error.stack,
+                    error:
+                      error instanceof Error ? error.message : String(error),
+                    stack: error instanceof Error ? error.stack : undefined,
                     correlationId,
                     projectId: project.id,
                   },
@@ -270,8 +271,8 @@ export class ProjectSyncProcessor {
             this.logger.warn(
               `Failed to process cause: ${cause.title} (ID: ${cause.id})`,
               {
-                error: error.message,
-                stack: error.stack,
+                error: error instanceof Error ? error.message : String(error),
+                stack: error instanceof Error ? error.stack : undefined,
                 correlationId,
                 causeId: cause.id,
               },
@@ -331,8 +332,8 @@ export class ProjectSyncProcessor {
         `Project synchronization failed after processing ${totalProjectsProcessed} projects ` +
           `in ${processingTime}ms`,
         {
-          error: error.message,
-          stack: error.stack,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
           correlationId,
           projectsProcessed: totalProjectsProcessed,
           causesProcessed: totalCausesProcessed,
@@ -354,7 +355,7 @@ export class ProjectSyncProcessor {
    */
   private async syncSingleProject(
     project: ProjectDetailsDto,
-    queryRunner: any,
+    queryRunner: QueryRunner,
     correlationId: string,
   ): Promise<void> {
     try {
@@ -429,8 +430,8 @@ export class ProjectSyncProcessor {
       this.logger.error(
         `Failed to sync project data for ${project.title} (ID: ${project.id})`,
         {
-          error: error.message,
-          stack: error.stack,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
           correlationId,
           projectId: project.id,
         },
@@ -458,8 +459,8 @@ export class ProjectSyncProcessor {
       return result;
     } catch (error) {
       this.logger.error('Manual project synchronization failed', {
-        error: error.message,
-        stack: error.stack,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
         correlationId,
       });
 
@@ -495,13 +496,115 @@ export class ProjectSyncProcessor {
       };
     } catch (error) {
       this.logger.error('Failed to get sync statistics', {
-        error: error.message,
-        stack: error.stack,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
       });
       return {
         totalProjects: 0,
         projectsWithTwitter: 0,
         projectsWithFarcaster: 0,
+      };
+    }
+  }
+
+  /**
+   * Test cause-project filtering behavior by analyzing GraphQL data
+   * This method helps validate that the system correctly filters to only
+   * save projects that are associated with at least one cause
+   */
+  async testCauseProjectFiltering(): Promise<{
+    totalCauses: number;
+    totalProjectsFromCauses: number;
+    uniqueProjectsFromCauses: number;
+    projectsInMultipleCauses: number;
+    sampleProjectSlugs: string[];
+  }> {
+    const correlationId = uuidv4();
+
+    this.logger.log('Testing cause-project filtering behavior', {
+      correlationId,
+    });
+
+    try {
+      // Fetch sample causes with projects to analyze filtering behavior
+      const { causes } = await this.impactGraphService.getAllCausesWithProjects(
+        10,
+        0,
+      );
+
+      const allProjects = new Map<
+        string,
+        {
+          id: string;
+          slug: string;
+          title: string;
+          causeCount: number;
+          projectType?: string;
+        }
+      >();
+
+      let totalProjectsFromCauses = 0;
+
+      // Process each cause and track project occurrences
+      causes.forEach(({ cause: _cause, projects }) => {
+        projects.forEach(project => {
+          totalProjectsFromCauses++;
+
+          const projectId = project.id.toString();
+          if (allProjects.has(projectId)) {
+            // Project appears in multiple causes
+            allProjects.get(projectId)!.causeCount++;
+          } else {
+            // First time seeing this project
+            allProjects.set(projectId, {
+              id: projectId,
+              slug: project.slug,
+              title: project.title,
+              causeCount: 1,
+              projectType: project.projectType,
+            });
+          }
+        });
+      });
+
+      const uniqueProjectsFromCauses = allProjects.size;
+      const projectsInMultipleCauses = Array.from(allProjects.values()).filter(
+        p => p.causeCount > 1,
+      ).length;
+
+      // Get sample project slugs for validation
+      const sampleProjectSlugs = Array.from(allProjects.values())
+        .slice(0, 5)
+        .map(p => p.slug);
+
+      const result = {
+        totalCauses: causes.length,
+        totalProjectsFromCauses,
+        uniqueProjectsFromCauses,
+        projectsInMultipleCauses,
+        sampleProjectSlugs,
+      };
+
+      this.logger.log('Cause-project filtering analysis completed', {
+        correlationId,
+        result,
+      });
+
+      return result;
+    } catch (error) {
+      this.logger.error('Failed to analyze cause-project filtering', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        correlationId,
+      });
+
+      // Return empty results on error
+      return {
+        totalCauses: 0,
+        totalProjectsFromCauses: 0,
+        uniqueProjectsFromCauses: 0,
+        projectsInMultipleCauses: 0,
+        sampleProjectSlugs: [],
       };
     }
   }
@@ -523,10 +626,10 @@ export class ProjectSyncProcessor {
         correlationId,
       ]);
 
-      return result.length > 0;
+      return Array.isArray(result) && result.length > 0;
     } catch (error) {
       this.logger.error('Failed to acquire sync lock', {
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
         correlationId,
       });
       return false;
@@ -546,7 +649,7 @@ export class ProjectSyncProcessor {
       await this.dataSource.query(releaseQuery, [SYNC_LOCK_KEY, correlationId]);
     } catch (error) {
       this.logger.error('Failed to release sync lock', {
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
         correlationId,
       });
     }
@@ -581,7 +684,7 @@ export class ProjectSyncProcessor {
         this.logger.warn(
           `Operation failed, retrying in ${totalDelayMs}ms (attempt ${attempt}/${maxRetries})`,
           {
-            error: error.message,
+            error: error instanceof Error ? error.message : String(error),
             correlationId,
             attempt,
             maxRetries,

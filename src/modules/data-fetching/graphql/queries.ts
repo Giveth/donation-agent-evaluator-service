@@ -273,24 +273,16 @@ export const ALL_CAUSES_WITH_PROJECTS_QUERY = gql`
       title
       description
       chainId
-      fundingPoolAddress
-      causeId
-      givpowerRank
-      instantBoostingRank
-      mainCategory
-      subCategories
-      status
-      listingStatus
       activeProjectsCount
       totalRaised
       totalDistributed
       totalDonated
-      createdAt
+      creationDate
       updatedAt
       projectType
 
-      # Owner information
-      owner {
+      # Admin user information (cause owner)
+      adminUser {
         id
         name
         walletAddress
@@ -325,13 +317,13 @@ export const ALL_CAUSES_WITH_PROJECTS_QUERY = gql`
         reviewStatus
         projectType
 
-        # Project status
-        status {
-          id
-          symbol
-          name
-          description
-        }
+        # Project status (commented out due to nullable field issues)
+        # status {
+        #   id
+        #   symbol
+        #   name
+        #   description
+        # }
 
         # Admin user (contains social media handles)
         adminUser {
@@ -440,24 +432,16 @@ export const CAUSE_BY_ID_QUERY = gql`
       title
       description
       chainId
-      fundingPoolAddress
-      causeId
-      givpowerRank
-      instantBoostingRank
-      mainCategory
-      subCategories
-      status
-      listingStatus
       activeProjectsCount
       totalRaised
       totalDistributed
       totalDonated
-      createdAt
+      creationDate
       updatedAt
       projectType
 
-      # Owner information
-      owner {
+      # Admin user information (cause owner)
+      adminUser {
         id
         name
         walletAddress
@@ -469,10 +453,178 @@ export const CAUSE_BY_ID_QUERY = gql`
         slug
         title
         projectType
+        # status {
+        #   id
+        #   symbol
+        #   name
+        # }
+      }
+    }
+  }
+`;
+
+/**
+ * Query to fetch causes with their associated projects for evaluation
+ * This query is optimized to provide all necessary data for the cause evaluation scoring process
+ */
+export const ALL_PROJECTS_WITH_FILTERS_QUERY = gql`
+  query GetCausesWithProjectsForEvaluation(
+    $limit: Float
+    $offset: Float
+    $searchTerm: String
+    $chainId: Float
+    $sortBy: String
+    $sortDirection: String
+    $listingStatus: String
+  ) {
+    causes(
+      limit: $limit
+      offset: $offset
+      searchTerm: $searchTerm
+      chainId: $chainId
+      sortBy: $sortBy
+      sortDirection: $sortDirection
+      listingStatus: $listingStatus
+    ) {
+      id
+      title
+      description
+      projectType
+      totalRaised
+      totalDistributed
+      totalDonated
+      activeProjectsCount
+      chainId
+      creationDate
+      updatedAt
+      latestUpdateCreationDate
+
+      # Admin user information (cause owner)
+      adminUser {
+        id
+        name
+        walletAddress
+      }
+
+      # All projects in this cause with complete data for evaluation
+      projects {
+        id
+        title
+        slug
+        description
+        descriptionSummary
+        projectType
+        verified
+        qualityScore
+        totalDonations
+        totalReactions
+        countUniqueDonors
+        latestUpdateCreationDate
+        updatedAt
+        creationDate
+        totalProjectUpdates
+        image
+        impactLocation
+
+        # Latest project update for content analysis
+        projectUpdate {
+          id
+          title
+          content
+          contentSummary
+          createdAt
+          isMain
+          totalReactions
+        }
+
+        # Categories for relevance assessment
+        categories {
+          id
+          name
+          value
+          mainCategory {
+            id
+            title
+            slug
+          }
+        }
+
+        # Social media links for handle extraction
+        socialMedia {
+          id
+          type
+          link
+        }
+
+        # Social profiles from verification
+        socialProfiles {
+          id
+          socialNetwork
+          name
+          link
+          isVerified
+        }
+
+        # Admin user (contains social media handles)
+        adminUser {
+          id
+          firstName
+          lastName
+          name
+          walletAddress
+          avatar
+          url
+          location
+        }
+
+        # Power ranking information for GIVpower rank scoring
+        projectPower {
+          projectId
+          totalPower
+          powerRank
+          round
+        }
+
+        # Instant power ranking
+        projectInstantPower {
+          projectId
+          totalPower
+          powerRank
+        }
+
+        # Project status information
         status {
           id
           symbol
           name
+          description
+        }
+
+        # Organization information
+        organization {
+          id
+          name
+          label
+          website
+        }
+
+        # Additional context fields
+        website
+        youtube
+        isGivbackEligible
+        giveBacks
+        listed
+        reviewStatus
+        verificationStatus
+
+        # Project addresses (wallet addresses)
+        addresses {
+          id
+          title
+          address
+          networkId
+          chainType
+          isRecipient
         }
       }
     }

@@ -136,6 +136,17 @@ GIVETH_API_KEY=your_giveth_key
 
 ## Development Guidelines
 
+### Code Quality Requirements
+
+**IMPORTANT: ALWAYS run code quality checks after making ANY code changes:**
+
+```bash
+npm run code:check         # Check linting and formatting
+npm run code:fix           # Fix linting and formatting issues
+```
+
+Both commands MUST be run after every code modification to ensure code quality standards are maintained.
+
 ### Running Tests for Social Media Services
 
 ```bash

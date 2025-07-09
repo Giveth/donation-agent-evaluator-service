@@ -32,6 +32,9 @@ export const PROJECT_BY_SLUG_QUERY = gql`
       isGivbackEligible
       reviewStatus
 
+      # Project type (project or cause)
+      projectType
+
       # Project status information (optional due to nullable status)
       # status {
       #   id
@@ -193,6 +196,7 @@ export const PROJECTS_BY_SLUGS_QUERY = gql`
         description
         descriptionSummary
         verified
+        projectType
         status {
           id
           name
@@ -283,6 +287,7 @@ export const ALL_CAUSES_WITH_PROJECTS_QUERY = gql`
       totalDonated
       createdAt
       updatedAt
+      projectType
 
       # Owner information
       owner {
@@ -318,6 +323,7 @@ export const ALL_CAUSES_WITH_PROJECTS_QUERY = gql`
         listed
         isGivbackEligible
         reviewStatus
+        projectType
 
         # Project status
         status {
@@ -448,6 +454,7 @@ export const CAUSE_BY_ID_QUERY = gql`
       totalDonated
       createdAt
       updatedAt
+      projectType
 
       # Owner information
       owner {
@@ -461,6 +468,7 @@ export const CAUSE_BY_ID_QUERY = gql`
         id
         slug
         title
+        projectType
         status {
           id
           symbol

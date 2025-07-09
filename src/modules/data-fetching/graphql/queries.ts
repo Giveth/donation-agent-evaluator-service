@@ -592,22 +592,6 @@ export const ALL_PROJECTS_WITH_FILTERS_QUERY = gql`
           powerRank
         }
 
-        # Project status information
-        status {
-          id
-          symbol
-          name
-          description
-        }
-
-        # Organization information
-        organization {
-          id
-          name
-          label
-          website
-        }
-
         # Additional context fields
         website
         youtube
@@ -616,16 +600,6 @@ export const ALL_PROJECTS_WITH_FILTERS_QUERY = gql`
         listed
         reviewStatus
         verificationStatus
-
-        # Project addresses (wallet addresses)
-        addresses {
-          id
-          title
-          address
-          networkId
-          chainType
-          isRecipient
-        }
       }
     }
   }

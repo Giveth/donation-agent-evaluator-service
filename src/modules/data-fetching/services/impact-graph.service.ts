@@ -96,6 +96,13 @@ export class ImpactGraphService {
 
       const project = createProjectDetailsDto(response.projectBySlug);
 
+      // Validate that this is actually a project
+      if (project.projectType && project.projectType !== 'project') {
+        this.logger.warn(
+          `Project ${slug} has unexpected projectType: ${project.projectType}`,
+        );
+      }
+
       this.logger.log(
         `Successfully fetched project: ${project.title} (slug: ${slug})`,
       );
@@ -148,9 +155,16 @@ export class ImpactGraphService {
         };
       }>(PROJECTS_BY_SLUGS_QUERY, variables);
 
-      const projects = response.projectsBySlugs.projects.map(project =>
-        createProjectDetailsDto(project),
-      );
+      const projects = response.projectsBySlugs.projects.map(project => {
+        const dto = createProjectDetailsDto(project);
+        // Log a warning if projectType is not 'project' for better debugging
+        if (dto.projectType && dto.projectType !== 'project') {
+          this.logger.warn(
+            `Project ${dto.slug} has unexpected projectType: ${dto.projectType}`,
+          );
+        }
+        return dto;
+      });
 
       this.logger.log(
         `Successfully fetched ${projects.length} projects by slugs`,
@@ -247,12 +261,26 @@ export class ImpactGraphService {
         // Create cause DTO
         const cause = createCauseDetailsDto(causeData);
 
+        // Validate that this is actually a cause
+        if (cause.projectType && cause.projectType !== 'cause') {
+          this.logger.warn(
+            `Cause ${cause.id} has unexpected projectType: ${cause.projectType}`,
+          );
+        }
+
         // Process projects separately to avoid circular dependency
         const projects = (
           (causeData as { projects?: GraphQLProjectData[] }).projects ?? []
-        ).map((project: GraphQLProjectData) =>
-          createProjectDetailsDto(project),
-        );
+        ).map((project: GraphQLProjectData) => {
+          const dto = createProjectDetailsDto(project);
+          // Validate that projects under causes are actually projects
+          if (dto.projectType && dto.projectType !== 'project') {
+            this.logger.warn(
+              `Project ${dto.slug} under cause ${cause.id} has unexpected projectType: ${dto.projectType}`,
+            );
+          }
+          return dto;
+        });
 
         return { cause, projects };
       });
@@ -304,6 +332,16 @@ export class ImpactGraphService {
       }
 
       const cause = createCauseProjectSlugsDto(response.cause);
+
+      // Validate that this is actually a cause
+      if (
+        (response.cause as any).projectType &&
+        (response.cause as any).projectType !== 'cause'
+      ) {
+        this.logger.warn(
+          `Cause ${causeId} has unexpected projectType: ${(response.cause as any).projectType}`,
+        );
+      }
 
       this.logger.log(
         `Successfully fetched cause: ${cause.title} (ID: ${causeId}) with ${cause.projectSlugs.length} projects`,

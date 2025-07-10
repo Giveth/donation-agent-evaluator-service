@@ -9,6 +9,7 @@ import {
   PROJECT_UPDATES_QUERY,
   ALL_CAUSES_WITH_PROJECTS_QUERY,
   CAUSE_BY_ID_QUERY,
+  ALL_PROJECTS_WITH_FILTERS_QUERY,
 } from '../graphql/queries';
 import {
   ProjectDetailsDto,
@@ -355,6 +356,111 @@ export class ImpactGraphService {
       this.handleGraphQLError(error as GraphQLError, 'getCauseById');
       throw new HttpException(
         `Failed to fetch cause with ID: ${causeId}`,
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    }
+  }
+
+  /**
+   * Fetch causes with their associated projects using filters for evaluation
+   * This method uses the ALL_PROJECTS_WITH_FILTERS_QUERY to fetch causes with filtering options
+   * @param limit - Number of causes to return (default: 50)
+   * @param offset - Number of causes to skip (default: 0)
+   * @param searchTerm - Optional search term to filter causes
+   * @param chainId - Optional chain ID to filter causes
+   * @param sortBy - Optional field to sort by
+   * @param sortDirection - Optional sort direction (ASC/DESC)
+   * @param listingStatus - Optional listing status filter
+   * @returns Array of causes with complete project data for evaluation
+   */
+  async getCausesWithProjectsForEvaluation(
+    limit: number = 50,
+    offset: number = 0,
+    searchTerm?: string,
+    chainId?: number,
+    sortBy?: string,
+    sortDirection?: string,
+    listingStatus?: string,
+  ): Promise<{
+    causes: Array<{ cause: CauseDetailsDto; projects: ProjectDetailsDto[] }>;
+    totalProcessed: number;
+  }> {
+    try {
+      this.logger.debug(
+        `Fetching causes with projects for evaluation (limit: ${limit}, offset: ${offset})`,
+        {
+          limit,
+          offset,
+          searchTerm,
+          chainId,
+          sortBy,
+          sortDirection,
+          listingStatus,
+        },
+      );
+
+      const variables = {
+        limit,
+        offset,
+        searchTerm,
+        chainId,
+        sortBy,
+        sortDirection,
+        listingStatus,
+      };
+
+      const response = await this.graphqlClient.request<{
+        causes: GraphQLCauseData[] | null;
+      }>(ALL_PROJECTS_WITH_FILTERS_QUERY, variables);
+
+      if (!response.causes || response.causes.length === 0) {
+        this.logger.warn('No causes found in filtered GraphQL response');
+        return { causes: [], totalProcessed: 0 };
+      }
+
+      const processedCauses = response.causes.map(causeData => {
+        // Create cause DTO
+        const cause = createCauseDetailsDto(causeData);
+
+        // Validate that this is actually a cause
+        if (cause.projectType && cause.projectType !== 'cause') {
+          this.logger.warn(
+            `Cause ${cause.id} has unexpected projectType: ${cause.projectType}`,
+          );
+        }
+
+        // Process projects separately to avoid circular dependency
+        const projects = (
+          (causeData as { projects?: GraphQLProjectData[] }).projects ?? []
+        ).map((project: GraphQLProjectData) => {
+          const dto = createProjectDetailsDto(project);
+          // Validate that projects under causes are actually projects
+          if (dto.projectType && dto.projectType !== 'project') {
+            this.logger.warn(
+              `Project ${dto.slug} under cause ${cause.id} has unexpected projectType: ${dto.projectType}`,
+            );
+          }
+          return dto;
+        });
+
+        return { cause, projects };
+      });
+
+      this.logger.log(
+        `Successfully fetched ${processedCauses.length} filtered causes with ${processedCauses.reduce((sum, c) => sum + c.projects.length, 0)} total projects`,
+      );
+
+      return {
+        causes: processedCauses,
+        totalProcessed: processedCauses.length,
+      };
+    } catch (error) {
+      this.handleGraphQLError(
+        error as GraphQLError,
+        'getCausesWithProjectsForEvaluation',
+      );
+      throw new HttpException(
+        'Failed to fetch filtered causes with projects from Impact-Graph',
         HttpStatus.SERVICE_UNAVAILABLE,
       );
     }

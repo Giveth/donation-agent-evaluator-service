@@ -83,9 +83,14 @@ export class ProjectSyncProcessor {
     );
 
     try {
-      await this.syncAllProjectsFromCauses(correlationId);
+      // Use the new filtered sync method with sorting for latest projects first
+      await this.syncProjectsFromFilteredCauses({
+        sortBy: 'creationDate',
+        sortDirection: 'DESC',
+        // No limit set - will fetch all projects in batches
+      });
       this.logger.log(
-        'Scheduled project synchronization completed successfully',
+        'Scheduled project synchronization completed successfully using filtered query',
         { correlationId },
       );
     } catch (error) {
@@ -116,7 +121,11 @@ export class ProjectSyncProcessor {
     });
 
     try {
-      const result = await this.syncAllProjectsFromCauses(correlationId);
+      const result = await this.syncProjectsFromFilteredCauses({
+        sortBy: 'creationDate',
+        sortDirection: 'DESC',
+        // No limit set - will fetch all projects in batches
+      });
 
       const processingTime = Date.now() - startTime;
       this.logger.log(
@@ -451,7 +460,11 @@ export class ProjectSyncProcessor {
     });
 
     try {
-      const result = await this.syncAllProjectsFromCauses(correlationId);
+      const result = await this.syncProjectsFromFilteredCauses({
+        sortBy: 'creationDate',
+        sortDirection: 'DESC',
+        // No limit set - will fetch all projects in batches
+      });
       this.logger.log(
         `Manual project synchronization completed in ${result.processingTimeMs}ms`,
         { correlationId, result },
@@ -504,6 +517,214 @@ export class ProjectSyncProcessor {
         projectsWithTwitter: 0,
         projectsWithFarcaster: 0,
       };
+    }
+  }
+
+  /**
+   * Synchronize projects from filtered causes using the ALL_PROJECTS_WITH_FILTERS_QUERY
+   * This method fetches causes with filtering options and saves only the projects to local database
+   * @param filterOptions - Optional filter parameters for causes
+   * @returns Sync result with statistics
+   */
+  async syncProjectsFromFilteredCauses(
+    filterOptions: {
+      limit?: number;
+      offset?: number;
+      searchTerm?: string;
+      chainId?: number;
+      sortBy?: string;
+      sortDirection?: string;
+      listingStatus?: string;
+    } = {},
+  ): Promise<SyncResult> {
+    const correlationId = uuidv4();
+    const startTime = Date.now();
+    let totalProjectsProcessed = 0;
+    let totalCausesProcessed = 0;
+    let totalErrors = 0;
+    const projectsProcessed = new Set<string>();
+
+    this.logger.log('Starting project synchronization from filtered causes', {
+      correlationId,
+      filterOptions,
+    });
+
+    // Use transaction for atomic operations
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // Fetch causes with projects in batches using filters
+      let offset = filterOptions.offset ?? 0;
+      const batchSize = filterOptions.limit ?? 50;
+      let hasMore = true;
+
+      while (hasMore) {
+        this.logger.debug(
+          `Fetching filtered causes batch: offset=${offset}, limit=${batchSize}`,
+          { correlationId, offset, batchSize, filterOptions },
+        );
+
+        const { causes } = await this.retryOperation(
+          () =>
+            this.impactGraphService.getCausesWithProjectsForEvaluation(
+              batchSize,
+              offset,
+              filterOptions.searchTerm,
+              filterOptions.chainId,
+              filterOptions.sortBy,
+              filterOptions.sortDirection,
+              filterOptions.listingStatus,
+            ),
+          3,
+          correlationId,
+        );
+
+        if (causes.length === 0) {
+          hasMore = false;
+          break;
+        }
+
+        // Process each cause and its projects
+        for (const { cause, projects } of causes) {
+          try {
+            this.logger.debug(
+              `Processing cause "${cause.title}" (ID: ${cause.id}) with ${projects.length} projects`,
+              {
+                correlationId,
+                causeId: cause.id,
+                projectCount: projects.length,
+                causeTitle: cause.title,
+              },
+            );
+
+            // Process each project in the cause
+            for (const project of projects) {
+              try {
+                // Skip if we've already processed this project (deduplicate across causes)
+                if (projectsProcessed.has(project.id.toString())) {
+                  this.logger.debug(
+                    `Skipping duplicate project: ${project.title} (ID: ${project.id})`,
+                    { correlationId, projectId: project.id },
+                  );
+                  continue;
+                }
+
+                await this.syncSingleProject(
+                  project,
+                  queryRunner,
+                  correlationId,
+                );
+                projectsProcessed.add(project.id.toString());
+                totalProjectsProcessed++;
+
+                // Add small delay to avoid overwhelming the database
+                if (totalProjectsProcessed % 10 === 0) {
+                  await new Promise(resolve => setTimeout(resolve, 100));
+                }
+              } catch (error) {
+                totalErrors++;
+                this.logger.warn(
+                  `Failed to sync project: ${project.title} (ID: ${project.id})`,
+                  {
+                    error:
+                      error instanceof Error ? error.message : String(error),
+                    stack: error instanceof Error ? error.stack : undefined,
+                    correlationId,
+                    projectId: project.id,
+                  },
+                );
+                // Continue with other projects
+              }
+            }
+
+            totalCausesProcessed++;
+          } catch (error) {
+            totalErrors++;
+            this.logger.warn(
+              `Failed to process cause: ${cause.title} (ID: ${cause.id})`,
+              {
+                error: error instanceof Error ? error.message : String(error),
+                stack: error instanceof Error ? error.stack : undefined,
+                correlationId,
+                causeId: cause.id,
+              },
+            );
+            // Continue with other causes
+          }
+        }
+
+        // Move to next batch (only if we're not using a specific limit)
+        if (!filterOptions.limit) {
+          offset += batchSize;
+          hasMore = causes.length === batchSize;
+        } else {
+          hasMore = false; // If specific limit was provided, don't continue
+        }
+
+        // Log progress
+        this.logger.log(
+          `Filtered batch completed. Processed ${totalCausesProcessed} causes, ` +
+            `${totalProjectsProcessed} unique projects so far...`,
+          {
+            correlationId,
+            causesProcessed: totalCausesProcessed,
+            projectsProcessed: totalProjectsProcessed,
+            errors: totalErrors,
+            filterOptions,
+          },
+        );
+      }
+
+      // Commit transaction
+      await queryRunner.commitTransaction();
+
+      const processingTime = Date.now() - startTime;
+      this.logger.log(
+        `Filtered project synchronization completed successfully. ` +
+          `Total: ${totalCausesProcessed} causes, ${totalProjectsProcessed} unique projects, ` +
+          `${totalErrors} errors, processing time: ${processingTime}ms`,
+        {
+          correlationId,
+          causesProcessed: totalCausesProcessed,
+          projectsProcessed: totalProjectsProcessed,
+          errors: totalErrors,
+          processingTimeMs: processingTime,
+          filterOptions,
+        },
+      );
+
+      return {
+        success: true,
+        projectsProcessed: totalProjectsProcessed,
+        causesProcessed: totalCausesProcessed,
+        processingTimeMs: processingTime,
+        errors: totalErrors,
+        correlationId,
+      };
+    } catch (error) {
+      // Rollback transaction on error
+      await queryRunner.rollbackTransaction();
+
+      const processingTime = Date.now() - startTime;
+      this.logger.error(
+        `Filtered project synchronization failed after processing ${totalProjectsProcessed} projects ` +
+          `in ${processingTime}ms`,
+        {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          correlationId,
+          projectsProcessed: totalProjectsProcessed,
+          causesProcessed: totalCausesProcessed,
+          errors: totalErrors,
+          filterOptions,
+        },
+      );
+      throw error;
+    } finally {
+      // Release query runner
+      await queryRunner.release();
     }
   }
 
@@ -605,6 +826,137 @@ export class ProjectSyncProcessor {
         uniqueProjectsFromCauses: 0,
         projectsInMultipleCauses: 0,
         sampleProjectSlugs: [],
+      };
+    }
+  }
+
+  /**
+   * Test the new filtered causes functionality
+   * This method validates that the ALL_PROJECTS_WITH_FILTERS_QUERY works correctly
+   * and returns the expected cause and project data
+   */
+  async testFilteredCausesQuery(
+    filterOptions: {
+      limit?: number;
+      offset?: number;
+      searchTerm?: string;
+      chainId?: number;
+      sortBy?: string;
+      sortDirection?: string;
+      listingStatus?: string;
+    } = {},
+  ): Promise<{
+    totalCauses: number;
+    totalProjectsFromCauses: number;
+    uniqueProjectsFromCauses: number;
+    projectsInMultipleCauses: number;
+    sampleProjectSlugs: string[];
+    sampleCauseTitles: string[];
+    filterOptions: any;
+  }> {
+    const correlationId = uuidv4();
+
+    this.logger.log('Testing filtered causes query functionality', {
+      correlationId,
+      filterOptions,
+    });
+
+    try {
+      // Test the new filtered query
+      const { causes } =
+        await this.impactGraphService.getCausesWithProjectsForEvaluation(
+          filterOptions.limit ?? 10,
+          filterOptions.offset ?? 0,
+          filterOptions.searchTerm,
+          filterOptions.chainId,
+          filterOptions.sortBy,
+          filterOptions.sortDirection,
+          filterOptions.listingStatus,
+        );
+
+      const allProjects = new Map<
+        string,
+        {
+          id: string;
+          slug: string;
+          title: string;
+          causeCount: number;
+          projectType?: string;
+        }
+      >();
+
+      let totalProjectsFromCauses = 0;
+      const causeTitles: string[] = [];
+
+      // Process each cause and track project occurrences
+      causes.forEach(({ cause, projects }) => {
+        causeTitles.push(cause.title);
+
+        projects.forEach(project => {
+          totalProjectsFromCauses++;
+
+          const projectId = project.id.toString();
+          if (allProjects.has(projectId)) {
+            // Project appears in multiple causes
+            allProjects.get(projectId)!.causeCount++;
+          } else {
+            // First time seeing this project
+            allProjects.set(projectId, {
+              id: projectId,
+              slug: project.slug,
+              title: project.title,
+              causeCount: 1,
+              projectType: project.projectType,
+            });
+          }
+        });
+      });
+
+      const uniqueProjectsFromCauses = allProjects.size;
+      const projectsInMultipleCauses = Array.from(allProjects.values()).filter(
+        p => p.causeCount > 1,
+      ).length;
+
+      // Get sample project slugs and cause titles for validation
+      const sampleProjectSlugs = Array.from(allProjects.values())
+        .slice(0, 5)
+        .map(p => p.slug);
+
+      const sampleCauseTitles = causeTitles.slice(0, 5);
+
+      const result = {
+        totalCauses: causes.length,
+        totalProjectsFromCauses,
+        uniqueProjectsFromCauses,
+        projectsInMultipleCauses,
+        sampleProjectSlugs,
+        sampleCauseTitles,
+        filterOptions,
+      };
+
+      this.logger.log('Filtered causes query test completed', {
+        correlationId,
+        result,
+      });
+
+      return result;
+    } catch (error) {
+      this.logger.error('Failed to test filtered causes query', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        correlationId,
+        filterOptions,
+      });
+
+      // Return empty results on error
+      return {
+        totalCauses: 0,
+        totalProjectsFromCauses: 0,
+        uniqueProjectsFromCauses: 0,
+        projectsInMultipleCauses: 0,
+        sampleProjectSlugs: [],
+        sampleCauseTitles: [],
+        filterOptions,
       };
     }
   }

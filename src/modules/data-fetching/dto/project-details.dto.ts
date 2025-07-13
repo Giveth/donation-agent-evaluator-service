@@ -95,16 +95,16 @@ export class ProjectAdminDto {
 }
 
 /**
- * DTO for project social media handles
+ * DTO for project social media URLs matching Impact Graph structure
  */
 export class ProjectSocialMediaDto {
   @IsOptional()
   @IsString()
-  twitter?: string;
+  X?: string;
 
   @IsOptional()
   @IsString()
-  farcaster?: string;
+  FARCASTER?: string;
 
   @IsOptional()
   @IsString()
@@ -139,8 +139,8 @@ export class ProjectSocialMediaDto {
   github?: string;
 
   constructor(data: {
-    twitter?: string;
-    farcaster?: string;
+    X?: string;
+    FARCASTER?: string;
     website?: string;
     youtube?: string;
     linkedin?: string;
@@ -150,8 +150,8 @@ export class ProjectSocialMediaDto {
     telegram?: string;
     github?: string;
   }) {
-    this.twitter = data.twitter;
-    this.farcaster = data.farcaster;
+    this.X = data.X;
+    this.FARCASTER = data.FARCASTER;
     this.website = data.website;
     this.youtube = data.youtube;
     this.linkedin = data.linkedin;
@@ -701,7 +701,8 @@ export class ProjectDetailsDto {
 }
 
 /**
- * Helper function to extract social media handles from project data
+ * Helper function to extract social media URLs from project data
+ * Stores full URLs exactly as they come from Impact Graph
  */
 export function extractSocialMediaHandles(
   project: unknown,
@@ -715,9 +716,9 @@ export function extractSocialMediaHandles(
   ) {
     (project as any).socialMedia.forEach((social: unknown) => {
       const socialObj = social as any;
-      const type = socialObj.type?.toLowerCase();
-      if (type && socialObj.link) {
-        handles[type] = socialObj.link;
+      const { type, link } = socialObj; // Preserve original case
+      if (type && link) {
+        handles[type] = link; // Store full URL
       }
     });
   }
@@ -729,9 +730,9 @@ export function extractSocialMediaHandles(
   ) {
     (project as any).socialProfiles.forEach((profile: unknown) => {
       const profileObj = profile as any;
-      const network = profileObj.socialNetwork?.toLowerCase();
-      if (network && profileObj.link) {
-        handles[network] = profileObj.link;
+      const { socialNetwork: network, link } = profileObj; // Preserve original case
+      if (network && link) {
+        handles[network] = link; // Store full URL
       }
     });
   }
@@ -741,9 +742,9 @@ export function extractSocialMediaHandles(
     (project as any).projectVerificationForm.socialProfiles.forEach(
       (profile: unknown) => {
         const profileObj = profile as any;
-        const network = profileObj.socialNetwork?.toLowerCase();
-        if (network && profileObj.link) {
-          handles[network] = profileObj.link;
+        const { socialNetwork: network, link } = profileObj; // Preserve original case
+        if (network && link) {
+          handles[network] = link; // Store full URL
         }
       },
     );

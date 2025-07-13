@@ -394,9 +394,9 @@ export class ProjectSyncProcessor {
         totalDonations: project.totalDonations,
         totalReactions: project.totalReactions,
 
-        // Social media handles
-        twitterHandle: socialMediaHandles.twitter,
-        farcasterUsername: socialMediaHandles.farcaster,
+        // Social media URLs
+        xUrl: socialMediaHandles.X,
+        farcasterUrl: socialMediaHandles.FARCASTER,
 
         // Metadata for tracking
         metadata: {
@@ -426,13 +426,13 @@ export class ProjectSyncProcessor {
 
       this.logger.debug(
         `Successfully synced project: ${project.title} (ID: ${project.id}) ` +
-          `with Twitter: ${socialMediaHandles.twitter ?? 'none'}, ` +
-          `Farcaster: ${socialMediaHandles.farcaster ?? 'none'}`,
+          `with X: ${socialMediaHandles.X ?? 'none'}, ` +
+          `Farcaster: ${socialMediaHandles.FARCASTER ?? 'none'}`,
         {
           correlationId,
           projectId: project.id,
-          twitterHandle: socialMediaHandles.twitter,
-          farcasterUsername: socialMediaHandles.farcaster,
+          xUrl: socialMediaHandles.X,
+          farcasterUrl: socialMediaHandles.FARCASTER,
         },
       );
     } catch (error) {
@@ -494,7 +494,7 @@ export class ProjectSyncProcessor {
   async getSyncStats(): Promise<{
     lastSyncTime?: Date;
     totalProjects: number;
-    projectsWithTwitter: number;
+    projectsWithX: number;
     projectsWithFarcaster: number;
   }> {
     try {
@@ -503,8 +503,8 @@ export class ProjectSyncProcessor {
 
       return {
         totalProjects: projects.length,
-        projectsWithTwitter: projects.filter(p => p.twitterHandle).length,
-        projectsWithFarcaster: projects.filter(p => p.farcasterUsername).length,
+        projectsWithX: projects.filter(p => p.xUrl).length,
+        projectsWithFarcaster: projects.filter(p => p.farcasterUrl).length,
         // TODO: Add lastSyncTime from metadata if needed
       };
     } catch (error) {
@@ -514,7 +514,7 @@ export class ProjectSyncProcessor {
       });
       return {
         totalProjects: 0,
-        projectsWithTwitter: 0,
+        projectsWithX: 0,
         projectsWithFarcaster: 0,
       };
     }

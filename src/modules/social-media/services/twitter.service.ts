@@ -376,18 +376,19 @@ export class TwitterService {
   /**
    * Fetches recent tweets for a given Twitter username or profile URL.
    * Returns up to 10 most recent tweets from the last 90 days.
+   * Now optimized to work with URL-based storage from Impact Graph.
    *
-   * @param twitterHandle - The Twitter username (without @) or full profile URL
+   * @param twitterUrl - The Twitter username (without @) or full profile URL
    * @returns Promise<SocialPostDto[]> - Array of recent tweets mapped to SocialPostDto
    */
-  async getRecentTweets(twitterHandle: string): Promise<SocialPostDto[]> {
-    if (!this.isValidTwitterHandle(twitterHandle)) {
-      this.logger.warn('Empty or invalid Twitter handle provided');
+  async getRecentTweets(twitterUrl: string): Promise<SocialPostDto[]> {
+    if (!this.isValidTwitterInput(twitterUrl)) {
+      this.logger.warn('Empty or invalid Twitter URL/handle provided');
       return [];
     }
 
-    // Clean the handle - remove @ if present and extract username from URL if needed
-    const cleanHandle = this.cleanTwitterHandle(twitterHandle);
+    // Extract username from URL or clean the handle
+    const username = this.extractUsernameFromTwitterUrl(twitterUrl);
 
     try {
       // Ensure we're authenticated before making requests
@@ -395,15 +396,15 @@ export class TwitterService {
 
       if (!this.isAuthenticated) {
         this.logger.warn(
-          `Cannot fetch tweets for ${cleanHandle}: Not authenticated. Returning empty array.`,
+          `Cannot fetch tweets for ${username}: Not authenticated. Returning empty array.`,
         );
         return [];
       }
 
-      return await this.getRecentTweetsInternal(cleanHandle);
+      return await this.getRecentTweetsInternal(username);
     } catch (error) {
       this.logger.error(
-        `Error fetching tweets for ${cleanHandle}: ${error.message}`,
+        `Error fetching tweets for ${username}: ${error.message}`,
         error.stack,
       );
 
@@ -484,40 +485,92 @@ export class TwitterService {
   }
 
   /**
-   * Validates if a Twitter handle is properly formatted and not empty.
+   * Validates if a Twitter input (URL or handle) is properly formatted and not empty.
    *
-   * @param handle - The Twitter handle to validate
-   * @returns boolean indicating if the handle is valid
+   * @param input - The Twitter URL or handle to validate
+   * @returns boolean indicating if the input is valid
    */
-  isValidTwitterHandle(handle: string | null | undefined): boolean {
-    if (!handle) return false;
+  isValidTwitterInput(input: string | null | undefined): boolean {
+    if (!input) return false;
 
-    const trimmed = handle.trim();
+    const trimmed = input.trim();
     if (trimmed.length === 0) return false;
 
-    // Basic validation - handle should not contain spaces or special chars
-    // (except @ which will be cleaned by cleanTwitterHandle)
+    // Check if it's a URL
+    if (this.isTwitterUrl(trimmed)) {
+      return true;
+    }
+
+    // Basic validation for username - handle should not contain spaces or special chars
+    // (except @ which will be cleaned by extractUsernameFromTwitterUrl)
     const validHandleRegex = /^@?[A-Za-z0-9_]+$/;
     return validHandleRegex.test(trimmed);
   }
 
   /**
+   * Validates if a Twitter handle is properly formatted and not empty.
+   * Kept for backward compatibility.
+   *
+   * @param handle - The Twitter handle to validate
+   * @returns boolean indicating if the handle is valid
+   */
+  isValidTwitterHandle(handle: string | null | undefined): boolean {
+    return this.isValidTwitterInput(handle);
+  }
+
+  /**
+   * Checks if a string is a Twitter/X URL.
+   *
+   * @param input - The input string to check
+   * @returns boolean indicating if it's a Twitter/X URL
+   */
+  isTwitterUrl(input: string): boolean {
+    const trimmed = input.trim().toLowerCase();
+    return trimmed.includes('twitter.com/') || trimmed.includes('x.com/');
+  }
+
+  /**
+   * Extracts username from Twitter/X URL or cleans a handle.
+   * Works with both URLs and plain usernames.
+   *
+   * @param input - Raw Twitter URL or username
+   * @returns Clean username without @ symbol
+   */
+  extractUsernameFromTwitterUrl(input: string): string {
+    const trimmed = input.trim();
+
+    // If it's a URL, extract the username
+    if (this.isTwitterUrl(trimmed)) {
+      const urlMatch = trimmed.match(/(?:twitter\.com|x\.com)\/([^/?#]+)/);
+      if (urlMatch?.[1]) {
+        return this.cleanUsername(urlMatch[1]);
+      }
+    }
+
+    // If it's just a username, clean it
+    return this.cleanUsername(trimmed);
+  }
+
+  /**
    * Cleans and normalizes Twitter handle input.
    * Handles both usernames and full URLs.
+   * Kept for backward compatibility.
    *
    * @param handle - Raw Twitter handle or URL
    * @returns Clean username without @ symbol
    */
   private cleanTwitterHandle(handle: string): string {
-    let cleaned = handle.trim();
+    return this.extractUsernameFromTwitterUrl(handle);
+  }
 
-    // If it's a URL, extract the username
-    if (cleaned.includes('twitter.com/') || cleaned.includes('x.com/')) {
-      const urlMatch = cleaned.match(/(?:twitter\.com|x\.com)\/([^/?#]+)/);
-      if (urlMatch?.[1]) {
-        cleaned = urlMatch[1];
-      }
-    }
+  /**
+   * Cleans a username by removing @ symbol and parameters.
+   *
+   * @param username - Raw username
+   * @returns Clean username
+   */
+  private cleanUsername(username: string): string {
+    let cleaned = username.trim();
 
     // Remove @ symbol if present
     if (cleaned.startsWith('@')) {
@@ -588,37 +641,37 @@ export class TwitterService {
   }
 
   /**
-   * Fetches recent tweets for multiple Twitter handles with rate limiting.
+   * Fetches recent tweets for multiple Twitter URLs/handles with rate limiting.
    * This method ensures authentication happens only once and reuses the session
    * for all handles, with proper delays to avoid getting blocked.
    *
-   * @param twitterHandles - Array of Twitter usernames (without @) or full profile URLs
+   * @param twitterInputs - Array of Twitter URLs or usernames (without @)
    * @returns Promise<HandleResult[]> - Array of results for each handle
    */
   async getRecentTweetsForHandles(
-    twitterHandles: string[],
+    twitterInputs: string[],
   ): Promise<HandleResult[]> {
-    if (twitterHandles.length === 0) {
-      this.logger.warn('Empty Twitter handles array provided');
+    if (twitterInputs.length === 0) {
+      this.logger.warn('Empty Twitter inputs array provided');
       return [];
     }
 
-    // Filter and clean valid handles
-    const validHandles = twitterHandles.filter(handle =>
-      this.isValidTwitterHandle(handle),
+    // Filter and extract valid usernames
+    const validInputs = twitterInputs.filter(input =>
+      this.isValidTwitterInput(input),
     );
-    if (validHandles.length < twitterHandles.length) {
+    if (validInputs.length < twitterInputs.length) {
       this.logger.warn(
-        `Filtered out ${twitterHandles.length - validHandles.length} invalid Twitter handles`,
+        `Filtered out ${twitterInputs.length - validInputs.length} invalid Twitter inputs`,
       );
     }
 
-    const cleanHandles = validHandles.map(handle =>
-      this.cleanTwitterHandle(handle),
+    const usernames = validInputs.map(input =>
+      this.extractUsernameFromTwitterUrl(input),
     );
 
     this.logger.log(
-      `Starting batch fetch for ${cleanHandles.length} handles: ${cleanHandles.join(', ')}`,
+      `Starting batch fetch for ${usernames.length} handles: ${usernames.join(', ')}`,
     );
 
     // Ensure we're authenticated before starting
@@ -628,8 +681,8 @@ export class TwitterService {
       this.logger.warn(
         'Cannot fetch tweets: Not authenticated. Returning empty results for all handles.',
       );
-      return cleanHandles.map(handle => ({
-        handle,
+      return usernames.map(username => ({
+        handle: username,
         posts: [],
         success: false,
         error: 'Not authenticated',
@@ -638,10 +691,10 @@ export class TwitterService {
 
     const results: HandleResult[] = [];
 
-    for (let i = 0; i < cleanHandles.length; i++) {
-      const handle = cleanHandles[i];
+    for (let i = 0; i < usernames.length; i++) {
+      const username = usernames[i];
       this.logger.log(
-        `Processing handle ${i + 1}/${cleanHandles.length}: ${handle}`,
+        `Processing handle ${i + 1}/${usernames.length}: ${username}`,
       );
 
       try {
@@ -651,25 +704,25 @@ export class TwitterService {
         }
 
         // Fetch tweets for this handle with retry logic
-        const posts = await this.fetchTweetsWithRetry(handle);
+        const posts = await this.fetchTweetsWithRetry(username);
 
         results.push({
-          handle,
+          handle: username,
           posts,
           success: true,
         });
 
         this.logger.log(
-          `Successfully fetched ${posts.length} tweets for ${handle}`,
+          `Successfully fetched ${posts.length} tweets for ${username}`,
         );
       } catch (error) {
         this.logger.error(
-          `Failed to fetch tweets for ${handle}: ${error.message}`,
+          `Failed to fetch tweets for ${username}: ${error.message}`,
           error.stack,
         );
 
         results.push({
-          handle,
+          handle: username,
           posts: [],
           success: false,
           error: error.message,
@@ -679,7 +732,7 @@ export class TwitterService {
 
     const successCount = results.filter(r => r.success).length;
     this.logger.log(
-      `Batch fetch completed: ${successCount}/${cleanHandles.length} handles successful`,
+      `Batch fetch completed: ${successCount}/${usernames.length} handles successful`,
     );
 
     return results;
@@ -832,7 +885,7 @@ export class TwitterService {
   }
 
   /**
-   * Fetches recent tweets for a Twitter handle with incremental fetching support.
+   * Fetches recent tweets for a Twitter URL/handle with incremental fetching support.
    * Stops scraping when it encounters a tweet with a timestamp that already exists in the database.
    * This method is designed for scheduled jobs to avoid re-scraping old tweets.
    *
@@ -841,20 +894,20 @@ export class TwitterService {
    * - Skips pinned tweets (isPin=true) unless they meet date criteria
    * - Only returns new tweets not yet in database
    *
-   * @param twitterHandle - The Twitter username (without @) or full profile URL
+   * @param twitterInput - The Twitter URL or username (without @)
    * @param sinceTimestamp - Optional timestamp to stop scraping when older tweets are encountered
    * @returns Promise<SocialPostDto[]> - Array of new tweets not yet in database
    */
   async getRecentTweetsIncremental(
-    twitterHandle: string,
+    twitterInput: string,
     sinceTimestamp?: Date,
   ): Promise<SocialPostDto[]> {
-    if (!this.isValidTwitterHandle(twitterHandle)) {
-      this.logger.warn('Empty or invalid Twitter handle provided');
+    if (!this.isValidTwitterInput(twitterInput)) {
+      this.logger.warn('Empty or invalid Twitter input provided');
       return [];
     }
 
-    const cleanHandle = this.cleanTwitterHandle(twitterHandle);
+    const username = this.extractUsernameFromTwitterUrl(twitterInput);
 
     try {
       // Ensure we're authenticated before making requests
@@ -862,13 +915,13 @@ export class TwitterService {
 
       if (!this.isAuthenticated) {
         this.logger.warn(
-          `Cannot fetch tweets for ${cleanHandle}: Not authenticated. Returning empty array.`,
+          `Cannot fetch tweets for ${username}: Not authenticated. Returning empty array.`,
         );
         return [];
       }
 
       this.logger.log(
-        `Fetching incremental Twitter posts for ${cleanHandle}${sinceTimestamp ? ` since ${sinceTimestamp.toISOString()}` : ''}`,
+        `Fetching incremental Twitter posts for ${username}${sinceTimestamp ? ` since ${sinceTimestamp.toISOString()}` : ''}`,
       );
 
       // Fetch tweets using the scraper with incremental logic
@@ -883,7 +936,7 @@ export class TwitterService {
           : cutoffDate;
 
       this.logger.debug(
-        `Effective cutoff date for ${cleanHandle}: ${effectiveCutoffDate.toISOString()}`,
+        `Effective cutoff date for ${username}: ${effectiveCutoffDate.toISOString()}`,
       );
 
       // Get tweets from the user's timeline
@@ -891,20 +944,20 @@ export class TwitterService {
       let stoppedDueToOldTweet = false;
       let skippedPinnedTweets = 0;
 
-      for await (const tweet of this.scraper.getTweets(cleanHandle, 30)) {
+      for await (const tweet of this.scraper.getTweets(username, 30)) {
         count++;
 
         // Check if we've hit our limits
         if (tweets.length >= 10) {
           this.logger.debug(
-            `${cleanHandle} - Reached 10 tweets limit (incremental)`,
+            `${username} - Reached 10 tweets limit (incremental)`,
           );
           break;
         }
 
         if (count >= 30) {
           this.logger.debug(
-            `${cleanHandle} - Reached safety limit of 30 iterations (incremental)`,
+            `${username} - Reached safety limit of 30 iterations (incremental)`,
           );
           break;
         }
@@ -915,12 +968,12 @@ export class TwitterService {
           // Only include pinned tweets if they're within our date range
           if (tweet.timeParsed && tweet.timeParsed >= effectiveCutoffDate) {
             this.logger.debug(
-              `${cleanHandle} - Including pinned tweet ${tweet.id} from ${tweet.timeParsed.toISOString()} (within date range)`,
+              `${username} - Including pinned tweet ${tweet.id} from ${tweet.timeParsed.toISOString()} (within date range)`,
             );
             tweets.push(tweet);
           } else {
             this.logger.debug(
-              `${cleanHandle} - Skipping pinned tweet ${tweet.id} (outside date range or no timestamp)`,
+              `${username} - Skipping pinned tweet ${tweet.id} (outside date range or no timestamp)`,
             );
             skippedPinnedTweets++;
           }
@@ -931,7 +984,7 @@ export class TwitterService {
         // This is the key incremental fetching logic
         if (tweet.timeParsed && tweet.timeParsed < effectiveCutoffDate) {
           this.logger.log(
-            `${cleanHandle} - Stopping incremental fetch: Tweet ${tweet.id} from ${tweet.timeParsed.toISOString()} is older than cutoff ${effectiveCutoffDate.toISOString()}`,
+            `${username} - Stopping incremental fetch: Tweet ${tweet.id} from ${tweet.timeParsed.toISOString()} is older than cutoff ${effectiveCutoffDate.toISOString()}`,
           );
           stoppedDueToOldTweet = true;
           break;
@@ -941,11 +994,11 @@ export class TwitterService {
         if (tweet.timeParsed && tweet.timeParsed >= effectiveCutoffDate) {
           tweets.push(tweet);
           this.logger.debug(
-            `${cleanHandle} - Added tweet ${tweet.id} from ${tweet.timeParsed.toISOString()} (incremental)`,
+            `${username} - Added tweet ${tweet.id} from ${tweet.timeParsed.toISOString()} (incremental)`,
           );
         } else if (!tweet.timeParsed) {
           this.logger.debug(
-            `${cleanHandle} - Tweet ${tweet.id} has no timeParsed, skipping (incremental)`,
+            `${username} - Tweet ${tweet.id} has no timeParsed, skipping (incremental)`,
           );
         }
       }
@@ -954,7 +1007,7 @@ export class TwitterService {
       const socialPosts = tweets.map(tweet => this.mapTweetToSocialPost(tweet));
 
       this.logger.log(
-        `Incremental fetch for ${cleanHandle} completed: ${socialPosts.length} new tweets found${
+        `Incremental fetch for ${username} completed: ${socialPosts.length} new tweets found${
           stoppedDueToOldTweet ? ' (stopped due to old tweet detection)' : ''
         }${
           skippedPinnedTweets > 0
@@ -966,7 +1019,7 @@ export class TwitterService {
       return socialPosts;
     } catch (error) {
       this.logger.error(
-        `Error in incremental fetch for ${cleanHandle}: ${error.message}`,
+        `Error in incremental fetch for ${username}: ${error.message}`,
         error.stack,
       );
 
@@ -977,10 +1030,10 @@ export class TwitterService {
   }
 
   /**
-   * Fetches recent tweets for multiple Twitter handles with incremental fetching support.
+   * Fetches recent tweets for multiple Twitter URLs/handles with incremental fetching support.
    * This method is optimized for scheduled jobs and batch processing.
    *
-   * @param accountsData - Array of objects with handle and optional sinceTimestamp for each account
+   * @param accountsData - Array of objects with URL/handle and optional sinceTimestamp for each account
    * @returns Promise<HandleResult[]> - Array of results for each handle
    */
   async getRecentTweetsForHandlesIncremental(
@@ -994,13 +1047,13 @@ export class TwitterService {
       return [];
     }
 
-    // Filter out accounts with invalid handles
+    // Filter out accounts with invalid inputs
     const validAccountsData = accountsData.filter(({ handle }) =>
-      this.isValidTwitterHandle(handle),
+      this.isValidTwitterInput(handle),
     );
     if (validAccountsData.length < accountsData.length) {
       this.logger.warn(
-        `Filtered out ${accountsData.length - validAccountsData.length} accounts with invalid Twitter handles`,
+        `Filtered out ${accountsData.length - validAccountsData.length} accounts with invalid Twitter inputs`,
       );
     }
 
@@ -1016,7 +1069,7 @@ export class TwitterService {
         'Cannot fetch tweets: Not authenticated. Returning empty results for all handles.',
       );
       return validAccountsData.map(({ handle }) => ({
-        handle: this.cleanTwitterHandle(handle),
+        handle: this.extractUsernameFromTwitterUrl(handle),
         posts: [],
         success: false,
         error: 'Not authenticated',
@@ -1027,10 +1080,10 @@ export class TwitterService {
 
     for (let i = 0; i < validAccountsData.length; i++) {
       const { handle, sinceTimestamp } = validAccountsData[i];
-      const cleanHandle = this.cleanTwitterHandle(handle);
+      const username = this.extractUsernameFromTwitterUrl(handle);
 
       this.logger.log(
-        `Processing handle ${i + 1}/${validAccountsData.length}: ${cleanHandle}${sinceTimestamp ? ` (since ${sinceTimestamp.toISOString()})` : ''}`,
+        `Processing handle ${i + 1}/${validAccountsData.length}: ${username}${sinceTimestamp ? ` (since ${sinceTimestamp.toISOString()})` : ''}`,
       );
 
       try {
@@ -1041,27 +1094,27 @@ export class TwitterService {
 
         // Fetch tweets for this handle with incremental logic
         const posts = await this.getRecentTweetsIncremental(
-          cleanHandle,
+          handle,
           sinceTimestamp,
         );
 
         results.push({
-          handle: cleanHandle,
+          handle: username,
           posts,
           success: true,
         });
 
         this.logger.log(
-          `Successfully fetched ${posts.length} tweets for ${cleanHandle}`,
+          `Successfully fetched ${posts.length} tweets for ${username}`,
         );
       } catch (error) {
         this.logger.error(
-          `Failed to fetch tweets for ${cleanHandle}: ${error.message}`,
+          `Failed to fetch tweets for ${username}: ${error.message}`,
           error.stack,
         );
 
         results.push({
-          handle: cleanHandle,
+          handle: username,
           posts: [],
           success: false,
           error: error.message,

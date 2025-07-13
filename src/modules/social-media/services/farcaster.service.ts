@@ -96,29 +96,31 @@ export class FarcasterService {
   }
 
   /**
-   * Fetch recent casts for a Farcaster username.
+   * Fetch recent casts for a Farcaster username or URL.
    * This is the main entry point for getting Farcaster posts.
+   * Now optimized to work with URL-based storage from Impact Graph.
    *
-   * @param farcasterUsername - The Farcaster username (e.g., 'dwr.eth', 'vitalik.eth')
+   * @param farcasterInput - The Farcaster username (e.g., 'dwr.eth', 'vitalik.eth') or full Warpcast URL
    * @returns Promise<SocialPostDto[]> - Array of recent casts converted to SocialPostDto
    */
-  async getRecentCasts(farcasterUsername: string): Promise<SocialPostDto[]> {
+  async getRecentCasts(farcasterInput: string): Promise<SocialPostDto[]> {
     try {
       this.logger.log(
-        `Fetching recent casts for Farcaster user: ${farcasterUsername}`,
+        `Fetching recent casts for Farcaster input: ${farcasterInput}`,
       );
 
-      // Validate username
-      if (!this.isValidFarcasterUsername(farcasterUsername)) {
-        this.logger.warn(`Invalid Farcaster username: ${farcasterUsername}`);
+      // Extract username from URL or validate input
+      const username = this.extractUsernameFromFarcasterUrl(farcasterInput);
+      if (!username) {
+        this.logger.warn(`Invalid Farcaster input: ${farcasterInput}`);
         return [];
       }
 
       // Step 1: Get FID from username
-      const fidResult = await this.getFidByUsername(farcasterUsername);
+      const fidResult = await this.getFidByUsername(username);
       if (!fidResult.success || !fidResult.fid) {
         this.logger.warn(
-          `Failed to get FID for username ${farcasterUsername}: ${fidResult.error}`,
+          `Failed to get FID for username ${username}: ${fidResult.error}`,
         );
         return [];
       }
@@ -149,15 +151,12 @@ export class FarcasterService {
       );
 
       this.logger.log(
-        `Successfully fetched ${socialPosts.length} casts for ${farcasterUsername} (FID: ${fidResult.fid})`,
+        `Successfully fetched ${socialPosts.length} casts for ${username} (FID: ${fidResult.fid})`,
       );
 
       return socialPosts;
     } catch (error) {
-      this.handleFarcasterError(
-        error,
-        `getRecentCasts for ${farcasterUsername}`,
-      );
+      this.handleFarcasterError(error, `getRecentCasts for ${farcasterInput}`);
       return [];
     }
   }
@@ -166,32 +165,33 @@ export class FarcasterService {
    * Fetch recent casts incrementally, stopping when hitting old casts.
    * This method is optimized for scheduled jobs to avoid re-processing old data.
    *
-   * @param farcasterUsername - The Farcaster username
+   * @param farcasterInput - The Farcaster username or Warpcast URL
    * @param sinceTimestamp - Optional timestamp to stop fetching at
    * @returns Promise<SocialPostDto[]> - Array of new casts since the timestamp
    */
   async getRecentCastsIncremental(
-    farcasterUsername: string,
+    farcasterInput: string,
     sinceTimestamp?: Date,
   ): Promise<SocialPostDto[]> {
     try {
+      // Extract username from URL or validate input
+      const username = this.extractUsernameFromFarcasterUrl(farcasterInput);
+      if (!username) {
+        this.logger.warn(`Invalid Farcaster input: ${farcasterInput}`);
+        return [];
+      }
+
       this.logger.log(
-        `Fetching incremental casts for ${farcasterUsername}${
+        `Fetching incremental casts for ${username}${
           sinceTimestamp ? ` since ${sinceTimestamp.toISOString()}` : ''
         }`,
       );
 
-      // Validate username
-      if (!this.isValidFarcasterUsername(farcasterUsername)) {
-        this.logger.warn(`Invalid Farcaster username: ${farcasterUsername}`);
-        return [];
-      }
-
       // Get FID from username
-      const fidResult = await this.getFidByUsername(farcasterUsername);
+      const fidResult = await this.getFidByUsername(username);
       if (!fidResult.success || !fidResult.fid) {
         this.logger.warn(
-          `Failed to get FID for username ${farcasterUsername}: ${fidResult.error}`,
+          `Failed to get FID for username ${username}: ${fidResult.error}`,
         );
         return [];
       }
@@ -235,14 +235,14 @@ export class FarcasterService {
       );
 
       this.logger.log(
-        `Incremental fetch completed for ${farcasterUsername}: ${socialPosts.length} new casts`,
+        `Incremental fetch completed for ${username}: ${socialPosts.length} new casts`,
       );
 
       return socialPosts;
     } catch (error) {
       this.handleFarcasterError(
         error,
-        `getRecentCastsIncremental for ${farcasterUsername}`,
+        `getRecentCastsIncremental for ${farcasterInput}`,
       );
       return [];
     }
@@ -458,6 +458,71 @@ export class FarcasterService {
   }
 
   /**
+   * Checks if a string is a Farcaster/Warpcast URL.
+   *
+   * @param input - The input string to check
+   * @returns boolean indicating if it's a Farcaster/Warpcast URL
+   */
+  isFarcasterUrl(input: string): boolean {
+    const trimmed = input.trim().toLowerCase();
+    return (
+      trimmed.includes('warpcast.com/') || trimmed.includes('farcaster.xyz/')
+    );
+  }
+
+  /**
+   * Extracts username from Farcaster/Warpcast URL or validates a username.
+   * Works with both URLs and plain usernames.
+   *
+   * @param input - Raw Farcaster URL or username
+   * @returns Clean username or null if invalid
+   */
+  extractUsernameFromFarcasterUrl(input: string): string | null {
+    if (!input || typeof input !== 'string') {
+      return null;
+    }
+
+    const trimmed = input.trim();
+
+    // If it's a URL, extract the username
+    if (this.isFarcasterUrl(trimmed)) {
+      const urlMatch = trimmed.match(
+        /(?:warpcast\.com|farcaster\.xyz)\/([^/?#]+)/,
+      );
+      if (urlMatch?.[1]) {
+        const extractedUsername = this.cleanFarcasterUsername(urlMatch[1]);
+        // Validate the extracted username
+        return this.isValidFarcasterUsername(extractedUsername)
+          ? extractedUsername
+          : null;
+      }
+      return null;
+    }
+
+    // If it's just a username, validate and clean it
+    return this.isValidFarcasterUsername(trimmed)
+      ? this.cleanFarcasterUsername(trimmed)
+      : null;
+  }
+
+  /**
+   * Cleans a Farcaster username by removing @ symbol.
+   *
+   * @param username - Raw username
+   * @returns Clean username
+   */
+  private cleanFarcasterUsername(username: string): string {
+    let cleaned = username.trim();
+
+    // Remove @ symbol if present
+    if (cleaned.startsWith('@')) {
+      cleaned = cleaned.substring(1);
+    }
+
+    return cleaned;
+  }
+
+  /**
    * Validate a Farcaster username format.
    *
    * @param username - The username to validate
@@ -473,10 +538,16 @@ export class FarcasterService {
       ? username.slice(1)
       : username;
 
-    // Basic validation: non-empty, reasonable length, no spaces
+    // More strict validation for Farcaster usernames
+    // Should not contain URLs, special characters except . and -
+    const validUsernameRegex = /^[a-zA-Z0-9._-]+$/;
+
     return (
       cleanUsername.length > 0 &&
       cleanUsername.length <= 50 &&
+      validUsernameRegex.test(cleanUsername) &&
+      !cleanUsername.includes('http') &&
+      !cleanUsername.includes('://') &&
       !cleanUsername.includes(' ') &&
       !cleanUsername.includes('\n') &&
       !cleanUsername.includes('\t')

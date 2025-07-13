@@ -75,7 +75,7 @@ export class FarcasterFetchProcessor {
       }
 
       // Validate Farcaster username exists
-      if (!projectAccount.farcasterUsername) {
+      if (!projectAccount.farcasterUrl) {
         const errorMsg = `No Farcaster username found for project ${projectId}`;
         this.logger.error(errorMsg);
         throw new Error(errorMsg);
@@ -85,19 +85,19 @@ export class FarcasterFetchProcessor {
       const latestTimestamp = projectAccount.latestFarcasterPostTimestamp;
 
       this.logger.debug(
-        `Fetching casts for ${projectAccount.farcasterUsername} ` +
+        `Fetching casts for ${projectAccount.farcasterUrl} ` +
           `(Project: ${projectId}, Since: ${latestTimestamp?.toISOString() ?? 'beginning'})`,
       );
 
       // Step 3: Fetch recent casts using incremental fetching
       const casts = await this.farcasterService.getRecentCastsIncremental(
-        projectAccount.farcasterUsername,
+        projectAccount.farcasterUrl,
         latestTimestamp ?? undefined,
       );
 
       if (casts.length === 0) {
         this.logger.log(
-          `No new casts found for ${projectAccount.farcasterUsername} (Project: ${projectId})`,
+          `No new casts found for ${projectAccount.farcasterUrl} (Project: ${projectId})`,
         );
 
         // Update last fetch timestamp even if no new casts
@@ -119,7 +119,7 @@ export class FarcasterFetchProcessor {
 
       // Step 4: Store new casts in database
       this.logger.log(
-        `Found ${casts.length} new casts for ${projectAccount.farcasterUsername}, storing...`,
+        `Found ${casts.length} new casts for ${projectAccount.farcasterUrl}, storing...`,
       );
 
       const storageResult =
@@ -154,7 +154,7 @@ export class FarcasterFetchProcessor {
       // Log success with detailed metrics
       const processingTime = Date.now() - startTime;
       this.logger.log(
-        `Successfully processed Farcaster fetch for ${projectAccount.farcasterUsername} ` +
+        `Successfully processed Farcaster fetch for ${projectAccount.farcasterUrl} ` +
           `(Project: ${projectId}): ${storageResult.stored} casts stored, ` +
           `${storageResult.duplicatesFound ? 'stopped at duplicate' : 'no duplicates'}, ` +
           `processing time: ${processingTime}ms`,
@@ -167,7 +167,7 @@ export class FarcasterFetchProcessor {
           castsStored: storageResult.stored,
           duplicatesFound: storageResult.duplicatesFound,
           processingTimeMs: processingTime,
-          farcasterUsername: projectAccount.farcasterUsername,
+          farcasterUrl: projectAccount.farcasterUrl,
         };
       }
     } catch (error) {

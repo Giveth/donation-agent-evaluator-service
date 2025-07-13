@@ -101,11 +101,11 @@ export class SocialPostStorageService {
       const { platform } = latestPost;
       if (platform === SocialMediaPlatform.TWITTER) {
         if (
-          !projectAccount.latestTwitterPostTimestamp ||
-          latestPost.createdAt > projectAccount.latestTwitterPostTimestamp
+          !projectAccount.latestXPostTimestamp ||
+          latestPost.createdAt > projectAccount.latestXPostTimestamp
         ) {
-          projectAccount.latestTwitterPostTimestamp = latestPost.createdAt;
-          projectAccount.lastTwitterFetch = new Date();
+          projectAccount.latestXPostTimestamp = latestPost.createdAt;
+          projectAccount.lastXFetch = new Date();
         }
       } else {
         if (
@@ -257,7 +257,7 @@ export class SocialPostStorageService {
   ): Promise<Date | null> {
     const projectAccount = await this.projectAccountRepository.findOne({
       where: { projectId },
-      select: ['latestTwitterPostTimestamp', 'latestFarcasterPostTimestamp'],
+      select: ['latestXPostTimestamp', 'latestFarcasterPostTimestamp'],
     });
 
     if (!projectAccount) {
@@ -265,7 +265,7 @@ export class SocialPostStorageService {
     }
 
     return platform === SocialMediaPlatform.TWITTER
-      ? (projectAccount.latestTwitterPostTimestamp ?? null)
+      ? (projectAccount.latestXPostTimestamp ?? null)
       : (projectAccount.latestFarcasterPostTimestamp ?? null);
   }
 
@@ -401,11 +401,11 @@ export class SocialPostStorageService {
       const { platform } = latestPost;
       if (platform === SocialMediaPlatform.TWITTER) {
         if (
-          !projectAccount.latestTwitterPostTimestamp ||
-          latestPost.createdAt > projectAccount.latestTwitterPostTimestamp
+          !projectAccount.latestXPostTimestamp ||
+          latestPost.createdAt > projectAccount.latestXPostTimestamp
         ) {
-          projectAccount.latestTwitterPostTimestamp = latestPost.createdAt;
-          projectAccount.lastTwitterFetch = new Date();
+          projectAccount.latestXPostTimestamp = latestPost.createdAt;
+          projectAccount.lastXFetch = new Date();
         }
       } else {
         if (
@@ -497,8 +497,8 @@ export class SocialPostStorageService {
         .createQueryBuilder('account')
         .where(
           platform === SocialMediaPlatform.TWITTER
-            ? "account.twitterHandle IS NOT NULL AND account.twitterHandle != ''"
-            : "account.farcasterUsername IS NOT NULL AND account.farcasterUsername != ''",
+            ? "account.xUrl IS NOT NULL AND account.xUrl != ''"
+            : "account.farcasterUrl IS NOT NULL AND account.farcasterUrl != ''",
         )
         .getMany();
 
@@ -511,8 +511,8 @@ export class SocialPostStorageService {
       for (const account of accounts) {
         const handle =
           platform === SocialMediaPlatform.TWITTER
-            ? account.twitterHandle
-            : account.farcasterUsername;
+            ? account.xUrl
+            : account.farcasterUrl;
 
         if (!handle) continue;
 

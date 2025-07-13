@@ -6,10 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { ImpactGraphService } from '../../data-fetching/services/impact-graph.service';
 import { ProjectSocialAccountService } from '../../social-media-storage/services/project-social-account.service';
 import { ScheduledJob } from '../../social-media-storage/entities/scheduled-job.entity';
-import {
-  ProjectDetailsDto,
-  extractSocialMediaHandles,
-} from '../../data-fetching/dto/project-details.dto';
+import { ProjectDetailsDto } from '../../data-fetching/dto/project-details.dto';
 
 /**
  * Interface for sync result statistics
@@ -368,8 +365,8 @@ export class ProjectSyncProcessor {
     correlationId: string,
   ): Promise<void> {
     try {
-      // Extract social media handles from various sources
-      const socialMediaHandles = extractSocialMediaHandles(project);
+      // Use social media handles that were already extracted during DTO creation
+      const socialMediaHandles = project.socialMediaHandles || {};
 
       // Prepare project data for upsert
       const projectData = {

@@ -221,7 +221,7 @@ export class AdminController {
       };
 
       // Attempt Twitter fetch if handle exists
-      if (projectAccount.twitterHandle) {
+      if (projectAccount.xUrl) {
         fetchResults.twitterFetch.attempted = true;
         try {
           const twitterJob = {
@@ -264,7 +264,7 @@ export class AdminController {
       }
 
       // Attempt Farcaster fetch if username exists
-      if (projectAccount.farcasterUsername) {
+      if (projectAccount.farcasterUrl) {
         fetchResults.farcasterFetch.attempted = true;
         try {
           const farcasterJob = {
@@ -394,7 +394,7 @@ export class AdminController {
     data: {
       sync: {
         totalProjects: number;
-        projectsWithTwitter: number;
+        projectsWithX: number;
         projectsWithFarcaster: number;
         lastSyncTime?: Date;
       };
@@ -503,7 +503,7 @@ export class AdminController {
       };
       database: {
         totalProjectsStored: number;
-        projectsWithTwitter: number;
+        projectsWithX: number;
         projectsWithFarcaster: number;
       };
       validation: {
@@ -543,7 +543,7 @@ export class AdminController {
         graphql: graphqlData,
         database: {
           totalProjectsStored: dbStats.totalProjects,
-          projectsWithTwitter: dbStats.projectsWithTwitter,
+          projectsWithX: dbStats.projectsWithX,
           projectsWithFarcaster: dbStats.projectsWithFarcaster,
         },
         validation: {

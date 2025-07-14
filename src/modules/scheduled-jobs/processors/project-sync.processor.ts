@@ -366,7 +366,7 @@ export class ProjectSyncProcessor {
   ): Promise<void> {
     try {
       // Use social media handles that were already extracted during DTO creation
-      const socialMediaHandles = project.socialMediaHandles || {};
+      const socialMediaHandles = project.socialMediaHandles ?? {};
 
       // Prepare project data for upsert
       const projectData = {

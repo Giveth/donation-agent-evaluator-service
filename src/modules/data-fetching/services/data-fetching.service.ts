@@ -177,7 +177,7 @@ export class DataFetchingService {
   async getCacheStatistics(): Promise<{
     totalProjectsInCache: number;
     projectsWithSocialMedia: {
-      twitter: number;
+      x: number;
       farcaster: number;
       total: number;
     };
@@ -230,8 +230,8 @@ export class DataFetchingService {
   ): ProjectDetailsDto {
     // Create social media handles object
     const socialMediaHandles = new ProjectSocialMediaDto({
-      twitter: project.twitterHandle ?? undefined,
-      farcaster: project.farcasterUsername ?? undefined,
+      X: project.xUrl ?? undefined,
+      FARCASTER: project.farcasterUrl ?? undefined,
     });
 
     // Map the entity to DTO format

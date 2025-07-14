@@ -68,6 +68,10 @@ export class CauseDetailsDto {
   @IsString()
   description!: string;
 
+  @IsOptional()
+  @IsString()
+  projectType?: string;
+
   @IsNumber()
   chainId!: number;
 
@@ -151,6 +155,7 @@ export class CauseDetailsDto {
     id: number;
     title: string;
     description: string;
+    projectType?: string;
     chainId: number;
     fundingPoolAddress: string;
     causeId: string;
@@ -174,6 +179,7 @@ export class CauseDetailsDto {
     this.id = data.id;
     this.title = data.title;
     this.description = data.description;
+    this.projectType = data.projectType;
     this.chainId = data.chainId;
     this.fundingPoolAddress = data.fundingPoolAddress;
     this.causeId = data.causeId;
@@ -246,6 +252,7 @@ export function createCauseDetailsDto(data: any): CauseDetailsDto {
     id: data.id,
     title: data.title,
     description: data.description,
+    projectType: data.projectType,
     chainId: data.chainId,
     fundingPoolAddress: data.fundingPoolAddress,
     causeId: data.causeId,

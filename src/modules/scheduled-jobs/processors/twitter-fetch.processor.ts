@@ -74,34 +74,34 @@ export class TwitterFetchProcessor {
       }
 
       // Validate Twitter handle exists
-      if (!projectAccount.twitterHandle) {
+      if (!projectAccount.xUrl) {
         const errorMsg = `No Twitter handle found for project ${projectId}`;
         this.logger.error(errorMsg);
         throw new Error(errorMsg);
       }
 
       // Step 2: Get the latest Twitter post timestamp for incremental fetching
-      const latestTimestamp = projectAccount.latestTwitterPostTimestamp;
+      const latestTimestamp = projectAccount.latestXPostTimestamp;
 
       this.logger.debug(
-        `Fetching tweets for @${projectAccount.twitterHandle} ` +
+        `Fetching tweets for @${projectAccount.xUrl} ` +
           `(Project: ${projectId}, Since: ${latestTimestamp?.toISOString() ?? 'beginning'})`,
       );
 
       // Step 3: Fetch recent tweets using incremental fetching
       const tweets = await this.twitterService.getRecentTweetsIncremental(
-        projectAccount.twitterHandle,
+        projectAccount.xUrl,
         latestTimestamp ?? undefined,
       );
 
       if (tweets.length === 0) {
         this.logger.log(
-          `No new tweets found for @${projectAccount.twitterHandle} (Project: ${projectId})`,
+          `No new tweets found for @${projectAccount.xUrl} (Project: ${projectId})`,
         );
 
         // Update last fetch timestamp even if no new tweets
         await this.projectSocialAccountService.upsertProjectAccount(projectId, {
-          lastTwitterFetch: new Date(),
+          lastXFetch: new Date(),
           metadata: {
             ...projectAccount.metadata,
             lastFetchResult: {
@@ -118,7 +118,7 @@ export class TwitterFetchProcessor {
 
       // Step 4: Store new tweets in database
       this.logger.log(
-        `Found ${tweets.length} new tweets for @${projectAccount.twitterHandle}, storing...`,
+        `Found ${tweets.length} new tweets for @${projectAccount.xUrl}, storing...`,
       );
 
       const storageResult =
@@ -130,7 +130,7 @@ export class TwitterFetchProcessor {
       // Step 5: Update project account with fetch results
       const now = new Date();
       const updateData = {
-        lastTwitterFetch: now,
+        lastXFetch: now,
         metadata: {
           ...projectAccount.metadata,
           lastFetchResult: {
@@ -153,7 +153,7 @@ export class TwitterFetchProcessor {
       // Log success with detailed metrics
       const processingTime = Date.now() - startTime;
       this.logger.log(
-        `Successfully processed Twitter fetch for @${projectAccount.twitterHandle} ` +
+        `Successfully processed Twitter fetch for @${projectAccount.xUrl} ` +
           `(Project: ${projectId}): ${storageResult.stored} tweets stored, ` +
           `${storageResult.duplicatesFound ? 'stopped at duplicate' : 'no duplicates'}, ` +
           `processing time: ${processingTime}ms`,
@@ -166,7 +166,7 @@ export class TwitterFetchProcessor {
           tweetsStored: storageResult.stored,
           duplicatesFound: storageResult.duplicatesFound,
           processingTimeMs: processingTime,
-          twitterHandle: projectAccount.twitterHandle,
+          xUrl: projectAccount.xUrl,
         };
       }
     } catch (error) {
@@ -239,7 +239,7 @@ export class TwitterFetchProcessor {
       // Get all projects with Twitter handles
       const projectsWithTwitter =
         await this.projectSocialAccountService.getProjectsForScheduling();
-      const twitterProjects = projectsWithTwitter.filter(p => p.twitterHandle);
+      const twitterProjects = projectsWithTwitter.filter(p => p.xUrl);
 
       // Calculate statistics from metadata
       let recentFetches = 0;
@@ -249,7 +249,7 @@ export class TwitterFetchProcessor {
       const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
       for (const project of twitterProjects) {
-        if (project.lastTwitterFetch && project.lastTwitterFetch > oneDayAgo) {
+        if (project.lastXFetch && project.lastXFetch > oneDayAgo) {
           recentFetches++;
         }
 
@@ -261,10 +261,10 @@ export class TwitterFetchProcessor {
 
         // Track most recent fetch
         if (
-          project.lastTwitterFetch &&
-          (!lastFetchTime || project.lastTwitterFetch > lastFetchTime)
+          project.lastXFetch &&
+          (!lastFetchTime || project.lastXFetch > lastFetchTime)
         ) {
-          lastFetchTime = project.lastTwitterFetch;
+          lastFetchTime = project.lastXFetch;
         }
       }
 

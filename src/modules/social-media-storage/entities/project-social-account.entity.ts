@@ -66,25 +66,25 @@ export class ProjectSocialAccount {
   @Column({ name: 'last_update_content', type: 'text', nullable: true })
   lastUpdateContent?: string;
 
-  // Social media handles
-  @Column({ name: 'twitter_handle', nullable: true })
-  twitterHandle?: string;
+  // Social media URLs
+  @Column({ name: 'x_url', nullable: true })
+  xUrl?: string;
 
-  @Column({ name: 'farcaster_username', nullable: true })
-  farcasterUsername?: string;
+  @Column({ name: 'farcaster_url', nullable: true })
+  farcasterUrl?: string;
 
-  @Column({ name: 'last_twitter_fetch', type: 'timestamp', nullable: true })
-  lastTwitterFetch?: Date;
+  @Column({ name: 'last_x_fetch', type: 'timestamp', nullable: true })
+  lastXFetch?: Date;
 
   @Column({ name: 'last_farcaster_fetch', type: 'timestamp', nullable: true })
   lastFarcasterFetch?: Date;
 
   @Column({
-    name: 'latest_twitter_post_timestamp',
+    name: 'latest_x_post_timestamp',
     type: 'timestamp',
     nullable: true,
   })
-  latestTwitterPostTimestamp?: Date;
+  latestXPostTimestamp?: Date;
 
   @Column({
     name: 'latest_farcaster_post_timestamp',

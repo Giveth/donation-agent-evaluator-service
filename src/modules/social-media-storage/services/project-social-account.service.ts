@@ -22,12 +22,12 @@ export interface ProjectAccountData {
   lastUpdateDate?: Date;
   lastUpdateContent?: string;
 
-  // Social media handles
-  twitterHandle?: string;
-  farcasterUsername?: string;
-  lastTwitterFetch?: Date;
+  // Social media URLs
+  xUrl?: string;
+  farcasterUrl?: string;
+  lastXFetch?: Date;
   lastFarcasterFetch?: Date;
-  latestTwitterPostTimestamp?: Date;
+  latestXPostTimestamp?: Date;
   latestFarcasterPostTimestamp?: Date;
   metadata?: Record<string, unknown>;
 }
@@ -135,11 +135,9 @@ export class ProjectSocialAccountService {
     try {
       return await this.projectAccountRepository
         .createQueryBuilder('account')
-        .where(
-          "(account.twitterHandle IS NOT NULL AND account.twitterHandle != '')",
-        )
+        .where("(account.xUrl IS NOT NULL AND account.xUrl != '')")
         .orWhere(
-          "(account.farcasterUsername IS NOT NULL AND account.farcasterUsername != '')",
+          "(account.farcasterUrl IS NOT NULL AND account.farcasterUrl != '')",
         )
         .getMany();
     } catch (error) {
@@ -148,16 +146,14 @@ export class ProjectSocialAccountService {
     }
   }
 
-  async getProjectsWithTwitterHandles(): Promise<ProjectSocialAccount[]> {
+  async getProjectsWithXUrls(): Promise<ProjectSocialAccount[]> {
     try {
       return await this.projectAccountRepository
         .createQueryBuilder('account')
-        .where(
-          "account.twitterHandle IS NOT NULL AND account.twitterHandle != ''",
-        )
+        .where("account.xUrl IS NOT NULL AND account.xUrl != ''")
         .getMany();
     } catch (error) {
-      this.logger.error('Failed to get projects with Twitter handles:', error);
+      this.logger.error('Failed to get projects with X URLs:', error);
       throw error;
     }
   }
@@ -180,7 +176,7 @@ export class ProjectSocialAccountService {
 
       const now = new Date();
       if (platform === SocialMediaPlatform.TWITTER) {
-        projectAccount.lastTwitterFetch = now;
+        projectAccount.lastXFetch = now;
       } else {
         projectAccount.lastFarcasterFetch = now;
       }
@@ -211,17 +207,15 @@ export class ProjectSocialAccountService {
 
       if (platform === SocialMediaPlatform.TWITTER) {
         queryBuilder
-          .where(
-            "account.twitterHandle IS NOT NULL AND account.twitterHandle != ''",
-          )
+          .where("account.xUrl IS NOT NULL AND account.xUrl != ''")
           .andWhere(
-            '(account.lastTwitterFetch IS NULL OR account.lastTwitterFetch < :cutoffTime)',
+            '(account.lastXFetch IS NULL OR account.lastXFetch < :cutoffTime)',
             { cutoffTime },
           );
       } else {
         queryBuilder
           .where(
-            "account.farcasterUsername IS NOT NULL AND account.farcasterUsername != ''",
+            "account.farcasterUrl IS NOT NULL AND account.farcasterUrl != ''",
           )
           .andWhere(
             '(account.lastFarcasterFetch IS NULL OR account.lastFarcasterFetch < :cutoffTime)',
@@ -246,29 +240,27 @@ export class ProjectSocialAccountService {
   }
 
   async getProjectCountWithSocialMedia(): Promise<{
-    twitter: number;
+    x: number;
     farcaster: number;
     total: number;
   }> {
     try {
-      const [twitterCount, farcasterCount, totalCount] = await Promise.all([
+      const [xCount, farcasterCount, totalCount] = await Promise.all([
         this.projectAccountRepository
           .createQueryBuilder('account')
-          .where(
-            "account.twitterHandle IS NOT NULL AND account.twitterHandle != ''",
-          )
+          .where("account.xUrl IS NOT NULL AND account.xUrl != ''")
           .getCount(),
         this.projectAccountRepository
           .createQueryBuilder('account')
           .where(
-            "account.farcasterUsername IS NOT NULL AND account.farcasterUsername != ''",
+            "account.farcasterUrl IS NOT NULL AND account.farcasterUrl != ''",
           )
           .getCount(),
         this.projectAccountRepository.count(),
       ]);
 
       return {
-        twitter: twitterCount,
+        x: xCount,
         farcaster: farcasterCount,
         total: totalCount,
       };
@@ -282,17 +274,17 @@ export class ProjectSocialAccountService {
   }
 
   /**
-   * Get projects with Farcaster usernames for efficient fetching statistics.
+   * Get projects with Farcaster URLs for efficient fetching statistics.
    * This method is optimized for the FarcasterFetchProcessor statistics.
    *
-   * @returns Promise<ProjectSocialAccount[]> - Projects with Farcaster usernames
+   * @returns Promise<ProjectSocialAccount[]> - Projects with Farcaster URLs
    */
   async getFarcasterProjects(): Promise<ProjectSocialAccount[]> {
     try {
       return await this.projectAccountRepository
         .createQueryBuilder('account')
         .where(
-          "account.farcasterUsername IS NOT NULL AND account.farcasterUsername != ''",
+          "account.farcasterUrl IS NOT NULL AND account.farcasterUrl != ''",
         )
         .getMany();
     } catch (error) {
@@ -302,7 +294,7 @@ export class ProjectSocialAccountService {
   }
 
   /**
-   * Get projects with Farcaster usernames that were recently fetched.
+   * Get projects with Farcaster URLs that were recently fetched.
    * This method pushes all filtering logic to the database level for optimal performance.
    *
    * @param since - Only include projects fetched after this date
@@ -317,7 +309,7 @@ export class ProjectSocialAccountService {
       const queryBuilder = this.projectAccountRepository
         .createQueryBuilder('account')
         .where(
-          "account.farcasterUsername IS NOT NULL AND account.farcasterUsername != ''",
+          "account.farcasterUrl IS NOT NULL AND account.farcasterUrl != ''",
         )
         .andWhere('account.lastFarcasterFetch IS NOT NULL')
         .andWhere('account.lastFarcasterFetch > :since', { since });
@@ -360,12 +352,12 @@ export class ProjectSocialAccountService {
       let farcasterQuery = this.projectAccountRepository
         .createQueryBuilder('account')
         .where(
-          "account.farcasterUsername IS NOT NULL AND account.farcasterUsername != ''",
+          "account.farcasterUrl IS NOT NULL AND account.farcasterUrl != ''",
         );
       let recentFetchesQuery = this.projectAccountRepository
         .createQueryBuilder('account')
         .where(
-          "account.farcasterUsername IS NOT NULL AND account.farcasterUsername != ''",
+          "account.farcasterUrl IS NOT NULL AND account.farcasterUrl != ''",
         )
         .andWhere('account.lastFarcasterFetch >= :oneDayAgo', { oneDayAgo });
 
@@ -396,7 +388,7 @@ export class ProjectSocialAccountService {
       const lastFetchResult = await this.projectAccountRepository
         .createQueryBuilder('account')
         .where(
-          "account.farcasterUsername IS NOT NULL AND account.farcasterUsername != ''",
+          "account.farcasterUrl IS NOT NULL AND account.farcasterUrl != ''",
         )
         .andWhere('account.lastFarcasterFetch IS NOT NULL')
         .orderBy('account.lastFarcasterFetch', 'DESC')
@@ -461,22 +453,21 @@ export class ProjectSocialAccountService {
       projectAccount.lastUpdateContent = data.lastUpdateContent;
     }
 
-    // Social media handles
-    if (data.twitterHandle !== undefined) {
-      projectAccount.twitterHandle = data.twitterHandle;
+    // Social media URLs
+    if (data.xUrl !== undefined) {
+      projectAccount.xUrl = data.xUrl;
     }
-    if (data.farcasterUsername !== undefined) {
-      projectAccount.farcasterUsername = data.farcasterUsername;
+    if (data.farcasterUrl !== undefined) {
+      projectAccount.farcasterUrl = data.farcasterUrl;
     }
-    if (data.lastTwitterFetch !== undefined) {
-      projectAccount.lastTwitterFetch = data.lastTwitterFetch;
+    if (data.lastXFetch !== undefined) {
+      projectAccount.lastXFetch = data.lastXFetch;
     }
     if (data.lastFarcasterFetch !== undefined) {
       projectAccount.lastFarcasterFetch = data.lastFarcasterFetch;
     }
-    if (data.latestTwitterPostTimestamp !== undefined) {
-      projectAccount.latestTwitterPostTimestamp =
-        data.latestTwitterPostTimestamp;
+    if (data.latestXPostTimestamp !== undefined) {
+      projectAccount.latestXPostTimestamp = data.latestXPostTimestamp;
     }
     if (data.latestFarcasterPostTimestamp !== undefined) {
       projectAccount.latestFarcasterPostTimestamp =
@@ -508,11 +499,11 @@ export class ProjectSocialAccountService {
       totalReactions: data.totalReactions ?? 0,
       lastUpdateDate: data.lastUpdateDate,
       lastUpdateContent: data.lastUpdateContent,
-      twitterHandle: data.twitterHandle,
-      farcasterUsername: data.farcasterUsername,
-      lastTwitterFetch: data.lastTwitterFetch,
+      xUrl: data.xUrl,
+      farcasterUrl: data.farcasterUrl,
+      lastXFetch: data.lastXFetch,
       lastFarcasterFetch: data.lastFarcasterFetch,
-      latestTwitterPostTimestamp: data.latestTwitterPostTimestamp,
+      latestXPostTimestamp: data.latestXPostTimestamp,
       latestFarcasterPostTimestamp: data.latestFarcasterPostTimestamp,
       metadata: data.metadata,
     };

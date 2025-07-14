@@ -66,7 +66,7 @@ export class JobSchedulerService {
     try {
       this.logger.log('Fetching projects with Twitter handles...');
       const projectsWithTwitter =
-        await this.projectSocialAccountService.getProjectsWithTwitterHandles();
+        await this.projectSocialAccountService.getProjectsWithXUrls();
 
       if (projectsWithTwitter.length === 0) {
         this.logger.log('No projects with Twitter handles found');
@@ -285,7 +285,7 @@ export class JobSchedulerService {
 
     try {
       const [twitterProjects, farcasterProjects] = await Promise.all([
-        this.projectSocialAccountService.getProjectsWithTwitterHandles(),
+        this.projectSocialAccountService.getProjectsWithXUrls(),
         this.projectSocialAccountService.getFarcasterProjects(),
       ]);
 

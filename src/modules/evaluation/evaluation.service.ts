@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import pLimit from 'p-limit';
 import { DataFetchingService } from '../data-fetching/services/data-fetching.service';
 import { SocialPostStorageService } from '../social-media-storage/services/social-post-storage.service';
 import { SocialMediaPlatform } from '../social-media/dto/social-post.dto';
@@ -9,12 +10,19 @@ import {
 } from './dto/evaluate-projects-request.dto';
 import { ScoredProjectDto } from './dto/scored-project.dto';
 import { EvaluationResultDto } from './dto/evaluation-result.dto';
+import { EvaluateMultipleCausesRequestDto } from './dto/evaluate-multiple-causes-request.dto';
+import {
+  MultiCauseEvaluationResultDto,
+  CauseEvaluationResult,
+  EvaluationStatus,
+} from './dto/multi-cause-evaluation-result.dto';
 import { ScoringService } from '../scoring/scoring.service';
 import { ProjectScoreInputsDto } from '../scoring/dto';
 
 @Injectable()
 export class EvaluationService {
   private readonly logger = new Logger(EvaluationService.name);
+  private readonly concurrencyLimit = pLimit(5); // Limit to 5 concurrent cause evaluations
 
   constructor(
     private readonly dataFetchingService: DataFetchingService,
@@ -202,5 +210,95 @@ export class EvaluationService {
       evaluationDuration: duration,
       timestamp: new Date(),
     };
+  }
+
+  /**
+   * Evaluates multiple causes with their associated projects in parallel.
+   * Returns results grouped by cause with aggregated metadata.
+   *
+   * @param request - Contains array of cause evaluation requests
+   * @returns Promise<MultiCauseEvaluationResultDto> - Results grouped by cause
+   */
+  async evaluateMultipleCauses(
+    request: EvaluateMultipleCausesRequestDto,
+  ): Promise<MultiCauseEvaluationResultDto> {
+    const startTime = Date.now();
+    const totalCauses = request.causes.length;
+
+    this.logger.log(
+      `Starting multi-cause evaluation for ${totalCauses} causes`,
+    );
+
+    // Process causes with concurrency control and error isolation
+    const causePromises = request.causes.map(causeRequest =>
+      this.concurrencyLimit(async () => {
+        const causeResult: CauseEvaluationResult = {
+          causeId: causeRequest.cause.id,
+          causeName: causeRequest.cause.title,
+          success: false,
+        };
+
+        try {
+          const result = await this.evaluateProjectsWithMetadata(causeRequest);
+          causeResult.result = result;
+          causeResult.success = true;
+
+          this.logger.debug(
+            `Cause ${causeRequest.cause.id} evaluation completed successfully`,
+          );
+        } catch (error) {
+          causeResult.error = error.message || 'Unknown error occurred';
+          causeResult.success = false;
+
+          this.logger.error(
+            `Failed to evaluate cause ${causeRequest.cause.id}:`,
+            error,
+          );
+        }
+
+        return causeResult;
+      }),
+    );
+
+    // Wait for all cause evaluations to complete
+    const causeResults = await Promise.all(causePromises);
+
+    // Calculate aggregated metadata
+    const successfulCauses = causeResults.filter(r => r.success);
+    const failedCauses = causeResults.filter(r => !r.success);
+
+    const totalProjects = successfulCauses.reduce(
+      (sum, r) => sum + (r.result?.totalProjects || 0),
+      0,
+    );
+
+    const totalProjectsWithStoredPosts = successfulCauses.reduce(
+      (sum, r) => sum + (r.result?.projectsWithStoredPosts || 0),
+      0,
+    );
+
+    const evaluationDuration = Date.now() - startTime;
+
+    const result: MultiCauseEvaluationResultDto = {
+      data: causeResults,
+      status:
+        failedCauses.length === 0
+          ? EvaluationStatus.SUCCESS
+          : EvaluationStatus.PARTIAL_SUCCESS,
+      totalCauses,
+      successfulCauses: successfulCauses.length,
+      failedCauses: failedCauses.length,
+      totalProjects,
+      totalProjectsWithStoredPosts,
+      evaluationDuration,
+      timestamp: new Date(),
+    };
+
+    this.logger.log(
+      `Multi-cause evaluation completed. ${successfulCauses.length}/${totalCauses} causes succeeded. ` +
+        `Duration: ${evaluationDuration}ms`,
+    );
+
+    return result;
   }
 }

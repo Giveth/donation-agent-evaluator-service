@@ -29,9 +29,15 @@ WORKDIR /usr/src/app
 # Copy production node_modules and built assets from the builder stage
 COPY --from=builder /usr/src/app/node_modules ./node_modules
 COPY --from=builder /usr/src/app/dist ./dist
+# Copy entrypoint script
+COPY docker-entrypoint.sh .
+
+# Make entrypoint executable
+RUN chmod +x docker-entrypoint.sh
 
 # Expose the application port
 EXPOSE 3000
 
-# Start the application
+# Use entrypoint to apply migrations and then start app
+ENTRYPOINT ["./docker-entrypoint.sh"]
 CMD ["node", "dist/main.js"]

@@ -7,10 +7,10 @@ services:
       - .env
     environment:
       NODE_ENV: production
-      PGSSLROOTCERT: db-ca.crt
+      PGSSLROOTCERT: /usr/src/app/db-ca.crt
       DATABASE_SSL_REJECT_UNAUTHORIZED: 'false'
     volumes:
-      - ./db-ca.crt:./db-ca.crt:ro
+      - ./db-ca.crt:/usr/src/app/db-ca.crt:ro
     ports:
       - '3001:3000'
     networks:

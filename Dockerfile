@@ -4,7 +4,7 @@
 # -----------------------------
 
 # -------- Build Stage --------
-FROM node:24-alpine3.21
+FROM node:24-alpine3.21 AS builder
 
 # Create app directory
 WORKDIR /usr/src/app

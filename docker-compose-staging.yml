@@ -1,20 +1,22 @@
 services:
-  # Main application container
   donation-agent-evaluator-service:
     image: ghcr.io/giveth/donation-agent-evaluator-service:staging
     container_name: donation-agent-evaluator-service
     restart: unless-stopped
-    # Load variables from the .env file in the repository root (override in deployment if needed)
     env_file:
       - .env
     environment:
       NODE_ENV: production
     ports:
       - "3000:3000"
-    depends_on:
-      - postgres
     networks:
       - agent-distribution-service
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      start_period: 30s
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 networks:
   agent-distribution-service:

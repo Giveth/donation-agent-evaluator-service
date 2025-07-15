@@ -29,6 +29,10 @@ WORKDIR /usr/src/app
 # Copy production node_modules and built assets from the builder stage
 COPY --from=builder /usr/src/app/node_modules ./node_modules
 COPY --from=builder /usr/src/app/dist ./dist
+# Also copy package.json, tsconfigs and source files needed for migrations
+COPY --from=builder /usr/src/app/package*.json ./
+COPY --from=builder /usr/src/app/tsconfig*.json ./
+COPY --from=builder /usr/src/app/src ./src
 # Copy entrypoint script
 COPY docker-entrypoint.sh .
 

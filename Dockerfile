@@ -11,7 +11,8 @@ WORKDIR /usr/src/app
 
 # Install app dependencies – use package-lock for repeatability
 COPY package*.json ./
-RUN npm ci --ignore-scripts
+COPY tsconfig*.json ./
+RUN npm ci
 
 # Copy source code
 COPY . .
@@ -20,7 +21,7 @@ COPY . .
 RUN npm run build
 
 # -------- Production Stage --------
-FROM node:24-alpine3.21 AS runner
+FROM node:24-alpine3.21
 
 ENV NODE_ENV=production
 WORKDIR /usr/src/app
@@ -29,11 +30,8 @@ WORKDIR /usr/src/app
 COPY --from=builder /usr/src/app/node_modules ./node_modules
 COPY --from=builder /usr/src/app/dist ./dist
 
-# Copy package.json files (helpful for introspection & debugging)
-COPY package*.json ./
-
 # Expose the application port
 EXPOSE 3000
 
 # Start the application
-CMD ["node", "dist/main.js"]
+CMD ["node", "dist/src/main.js"]

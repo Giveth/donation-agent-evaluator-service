@@ -16,6 +16,7 @@ import { DataFetchingModule } from './modules/data-fetching/data-fetching.module
 import { EvaluationModule } from './modules/evaluation/evaluation.module';
 import { LLMIntegrationModule } from './modules/llm-integration/llm-integration.module';
 import { ScoringModule } from './modules/scoring/scoring.module';
+import { HealthModule } from './modules/health/health.module';
 
 @Module({
   imports: [
@@ -123,6 +124,7 @@ import { ScoringModule } from './modules/scoring/scoring.module';
     LLMIntegrationModule,
     ScoringModule,
     EvaluationModule,
+    HealthModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -64,13 +64,7 @@ export class EvaluationService {
             projectsWithStoredPosts++;
           }
         } catch (error) {
-          this.logger.error(
-            `❌ Failed to evaluate project ${project.id}:`,
-            error,
-          );
-          if (error.stack) {
-            this.logger.error(`Error stack trace:`, error.stack);
-          }
+          this.logger.error(`Failed to evaluate project ${project.id}:`, error);
           // Continue with other projects, add zero-score entry
           scoredProjects.push({
             projectId: project.id.toString(),
@@ -108,18 +102,12 @@ export class EvaluationService {
     project: ProjectDetailsDto,
     cause: CauseDto,
   ): Promise<ScoredProjectDto> {
-    this.logger.debug(`🔍 Evaluating project ${project.id} (${project.title})`);
-    this.logger.debug(
-      `📋 Project details: status=${project.status?.name}, qualityScore=${project.qualityScore}, givPowerRank=${project.givPowerRank}`,
-    );
+    this.logger.debug(`Evaluating project ${project.id} (${project.title})`);
 
     // All projects are eligible for evaluation
-    this.logger.debug(`✅ Project ${project.id} proceeding with evaluation`);
+    this.logger.debug(`Project ${project.id} proceeding with evaluation`);
 
     // Fetch stored social posts for this project (database-first approach)
-    this.logger.debug(
-      `📱 Fetching social media posts for project ${project.id}`,
-    );
 
     const [twitterPosts, farcasterPosts] = await Promise.all([
       this.socialPostStorageService.getRecentSocialPosts(
@@ -142,12 +130,10 @@ export class EvaluationService {
         : undefined;
 
     this.logger.debug(
-      `📊 Project ${project.id}: Found ${twitterPosts.length} Twitter posts, ${farcasterPosts.length} Farcaster posts`,
+      `Project ${project.id}: Found ${twitterPosts.length} Twitter posts, ${farcasterPosts.length} Farcaster posts`,
     );
 
     // Prepare scoring input
-    this.logger.debug(`🔧 Preparing scoring input for project ${project.id}`);
-
     const scoringInput = new ProjectScoreInputsDto({
       projectId: project.id.toString(),
       projectTitle: project.title,
@@ -165,17 +151,8 @@ export class EvaluationService {
     });
 
     // Calculate scores using the scoring service
-    this.logger.debug(`🧮 Calling scoring service for project ${project.id}`);
-    this.logger.debug(
-      `📋 Scoring input validation: projectId=${scoringInput.projectId}, socialPosts=${scoringInput.socialPosts.length}`,
-    );
-
     const { finalScore, breakdown } =
       await this.scoringService.calculateCauseScore(scoringInput);
-
-    this.logger.debug(
-      `✅ Scoring completed for project ${project.id}: finalScore=${finalScore}`,
-    );
 
     const result = {
       projectId: project.id.toString(),
@@ -187,7 +164,7 @@ export class EvaluationService {
       evaluationTimestamp: new Date(),
     };
 
-    this.logger.debug(`🎯 Project ${project.id} evaluation complete:`, {
+    this.logger.debug(`Project ${project.id} evaluation complete:`, {
       causeScore: result.causeScore,
       hasBreakdown: !!result.scoreBreakdown,
       hasStoredPosts: result.hasStoredPosts,

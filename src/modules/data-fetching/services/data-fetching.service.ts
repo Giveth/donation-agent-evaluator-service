@@ -245,9 +245,7 @@ export class DataFetchingService {
       socialMediaHandles,
       qualityScore: project.qualityScore,
       givPowerRank: project.givPowerRank,
-      verified: project.verified,
       totalDonations: project.totalDonations,
-      totalReactions: project.totalReactions,
       // Set status based on projectStatus
       status: project.projectStatus
         ? {
@@ -265,7 +263,6 @@ export class DataFetchingService {
       lastUpdateTitle: undefined,
       mainCategory: undefined,
       subCategories: [],
-      verificationStatus: project.verified ? 'verified' : 'unverified',
       isGivbackEligible: undefined,
       giveBacks: undefined,
       listed: undefined,
@@ -292,7 +289,6 @@ export class DataFetchingService {
             content: project.lastUpdateContent,
             createdAt: project.lastUpdateDate ?? new Date(),
             isMain: true,
-            totalReactions: project.totalReactions,
           }
         : undefined,
       projectUpdates: undefined,

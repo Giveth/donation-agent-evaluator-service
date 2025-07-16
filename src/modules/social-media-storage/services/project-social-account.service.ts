@@ -10,13 +10,11 @@ export interface ProjectAccountData {
   slug?: string;
   description?: string;
   projectStatus?: string;
-  verified?: boolean;
 
   // Project metrics
   qualityScore?: number;
   givPowerRank?: number;
   totalDonations?: number;
-  totalReactions?: number;
 
   // Project update information
   lastUpdateDate?: Date;
@@ -427,9 +425,7 @@ export class ProjectSocialAccountService {
     if (data.projectStatus !== undefined) {
       projectAccount.projectStatus = data.projectStatus;
     }
-    if (data.verified !== undefined) {
-      projectAccount.verified = data.verified;
-    }
+    // verified field removed
 
     // Project metrics
     if (data.qualityScore !== undefined) {
@@ -441,9 +437,7 @@ export class ProjectSocialAccountService {
     if (data.totalDonations !== undefined) {
       projectAccount.totalDonations = data.totalDonations;
     }
-    if (data.totalReactions !== undefined) {
-      projectAccount.totalReactions = data.totalReactions;
-    }
+    // totalReactions field removed
 
     // Project update information
     if (data.lastUpdateDate !== undefined) {
@@ -492,11 +486,9 @@ export class ProjectSocialAccountService {
       slug: data.slug ?? '',
       description: data.description,
       projectStatus: data.projectStatus ?? 'UNKNOWN',
-      verified: data.verified ?? false,
       qualityScore: data.qualityScore,
       givPowerRank: data.givPowerRank,
       totalDonations: data.totalDonations ?? 0,
-      totalReactions: data.totalReactions ?? 0,
       lastUpdateDate: data.lastUpdateDate,
       lastUpdateContent: data.lastUpdateContent,
       xUrl: data.xUrl,

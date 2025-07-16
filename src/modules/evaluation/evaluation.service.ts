@@ -197,6 +197,7 @@ export class EvaluationService {
     return {
       data: scoredProjects,
       status: 'success',
+      causeId: request.cause.id,
       totalProjects: scoredProjects.length,
       projectsWithStoredPosts,
       evaluationDuration: duration,

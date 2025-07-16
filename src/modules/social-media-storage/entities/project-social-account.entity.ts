@@ -31,9 +31,6 @@ export class ProjectSocialAccount {
   @Column({ name: 'project_status', type: 'varchar', length: 100 })
   projectStatus: string;
 
-  @Column({ name: 'verified', type: 'boolean', default: false })
-  verified: boolean;
-
   // Project metrics
   @Column({
     name: 'quality_score',
@@ -55,9 +52,6 @@ export class ProjectSocialAccount {
     default: 0,
   })
   totalDonations: number;
-
-  @Column({ name: 'total_reactions', type: 'integer', default: 0 })
-  totalReactions: number;
 
   // Project update information
   @Column({ name: 'last_update_date', type: 'timestamp', nullable: true })
@@ -92,9 +86,6 @@ export class ProjectSocialAccount {
     nullable: true,
   })
   latestFarcasterPostTimestamp?: Date;
-
-  @Column({ name: 'metadata', type: 'jsonb', nullable: true })
-  metadata?: Record<string, unknown>;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

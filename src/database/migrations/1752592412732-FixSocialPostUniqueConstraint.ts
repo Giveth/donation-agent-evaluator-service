@@ -6,13 +6,13 @@ export class FixSocialPostUniqueConstraint1752592412732
   name = 'FixSocialPostUniqueConstraint1752592412732';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // Drop the existing unique constraint on post_id only
+    // Drop the existing unique constraint on post_id only (if exists)
     await queryRunner.query(
-      `ALTER TABLE "stored_social_posts" DROP CONSTRAINT "UQ_092dae23274c272343e753e30ca"`,
+      `ALTER TABLE "stored_social_posts" DROP CONSTRAINT IF EXISTS "UQ_092dae23274c272343e753e30ca"`,
     );
 
-    // Drop the corresponding unique index
-    await queryRunner.query(`DROP INDEX "IDX_092dae23274c272343e753e30c"`);
+    // Drop the corresponding unique index (if exists)
+    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_092dae23274c272343e753e30c"`);
 
     // Add composite unique constraint on (post_id, project_account_id)
     await queryRunner.query(

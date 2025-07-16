@@ -248,7 +248,7 @@ export class EvaluationService {
             `Cause ${causeRequest.cause.id} evaluation completed successfully`,
           );
         } catch (error) {
-          causeResult.error = error.message || 'Unknown error occurred';
+          causeResult.error = error.message ?? 'Unknown error occurred';
           causeResult.success = false;
 
           this.logger.error(
@@ -269,12 +269,12 @@ export class EvaluationService {
     const failedCauses = causeResults.filter(r => !r.success);
 
     const totalProjects = successfulCauses.reduce(
-      (sum, r) => sum + (r.result?.totalProjects || 0),
+      (sum, r) => sum + (r.result?.totalProjects ?? 0),
       0,
     );
 
     const totalProjectsWithStoredPosts = successfulCauses.reduce(
-      (sum, r) => sum + (r.result?.projectsWithStoredPosts || 0),
+      (sum, r) => sum + (r.result?.projectsWithStoredPosts ?? 0),
       0,
     );
 

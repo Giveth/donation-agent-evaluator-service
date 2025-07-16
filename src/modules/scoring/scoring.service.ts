@@ -77,11 +77,22 @@ export class ScoringService {
     causeScore: number;
     breakdown: CauseScoreBreakdownDto;
   }> {
-    this.logger.debug(`Calculating cause score for project ${input.projectId}`);
+    this.logger.debug(
+      `🔢 Calculating cause score for project ${input.projectId}`,
+    );
+    this.logger.debug(
+      `📊 Input validation: projectId=${input.projectId}, socialPosts=${input.socialPosts.length}, lastUpdateDate=${input.lastUpdateDate?.toISOString()}`,
+    );
 
     try {
       // Get LLM assessments for quality and relevance
+      this.logger.debug(
+        `🧠 Starting LLM assessment for project ${input.projectId}`,
+      );
       const llmAssessment = await this.performLLMAssessment(input);
+      this.logger.debug(
+        `✅ LLM assessment completed for project ${input.projectId}`,
+      );
 
       // Calculate individual score components
       const breakdown: CauseScoreBreakdownDto = {
@@ -107,16 +118,20 @@ export class ScoringService {
       const causeScore = this.calculateWeightedScore(breakdown);
 
       this.logger.debug(
-        `Project ${input.projectId} scored ${causeScore} with breakdown:`,
+        `✅ Project ${input.projectId} scored ${causeScore} with breakdown:`,
         breakdown,
       );
 
       return { causeScore, breakdown };
     } catch (error) {
       this.logger.error(
-        `Failed to calculate cause score for project ${input.projectId}:`,
+        `❌ Failed to calculate cause score for project ${input.projectId}:`,
         error,
       );
+
+      if (error.stack) {
+        this.logger.error(`Error stack trace:`, error.stack);
+      }
 
       // Return zero scores on error
       const breakdown: CauseScoreBreakdownDto = {
@@ -129,6 +144,9 @@ export class ScoringService {
         givPowerRankScore: 0,
       };
 
+      this.logger.warn(
+        `⚠️  Returning zero scores for project ${input.projectId}`,
+      );
       return { causeScore: 0, breakdown };
     }
   }
@@ -139,6 +157,10 @@ export class ScoringService {
   private async performLLMAssessment(
     input: ScoringInputDto,
   ): Promise<LLMAssessmentDto> {
+    this.logger.debug(
+      `🧠 Starting LLM assessment for project ${input.projectId}`,
+    );
+
     try {
       // Prepare social media content for assessment
       const recentPosts = input.socialPosts
@@ -148,6 +170,10 @@ export class ScoringService {
           content: post.text,
           createdAt: post.createdAt,
         }));
+
+      this.logger.debug(
+        `📝 Prepared ${recentPosts.length} social posts for assessment`,
+      );
 
       // Create the assessment prompt
       const systemPrompt = `You are an expert evaluator for charitable projects. 
@@ -192,6 +218,10 @@ Respond in JSON format:
   "relevanceToCauseReasoning": "<brief explanation>"
 }`;
 
+      this.logger.debug(
+        `🚀 Calling LLM service for project ${input.projectId}`,
+      );
+
       const response = await this.llmService.createChatCompletion(
         [
           { role: 'system', content: systemPrompt },
@@ -204,15 +234,46 @@ Respond in JSON format:
         },
       );
 
+      this.logger.debug(
+        `✅ LLM service responded for project ${input.projectId}`,
+      );
+
       const content = response.choices[0]?.message?.content;
       if (!content) {
+        this.logger.error(
+          `❌ No content in LLM response for project ${input.projectId}`,
+        );
         throw new Error('No response from LLM');
       }
 
+      this.logger.debug(
+        `📄 LLM response content: ${content.substring(0, 200)}...`,
+      );
+
       const assessment = JSON.parse(content) as LLMAssessmentDto;
+
+      this.logger.debug(
+        `✅ LLM assessment parsed successfully for project ${input.projectId}:`,
+        {
+          projectInfoQualityScore: assessment.projectInfoQualityScore,
+          socialMediaQualityScore: assessment.socialMediaQualityScore,
+          relevanceToCauseScore: assessment.relevanceToCauseScore,
+        },
+      );
+
       return new LLMAssessmentDto(assessment);
     } catch (error) {
-      this.logger.error('LLM assessment failed:', error);
+      this.logger.error(
+        `❌ LLM assessment failed for project ${input.projectId}:`,
+        error,
+      );
+      if (error.response) {
+        this.logger.error(`LLM API Response Status: ${error.response.status}`);
+        this.logger.error(`LLM API Response Data:`, error.response.data);
+      }
+      this.logger.warn(
+        `⚠️  Returning zero scores for project ${input.projectId}`,
+      );
       return LLMAssessmentDto.createZeroScores();
     }
   }

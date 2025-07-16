@@ -12,7 +12,9 @@ export class FixSocialPostUniqueConstraint1752592412732
     );
 
     // Drop the corresponding unique index (if exists)
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_092dae23274c272343e753e30c"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_092dae23274c272343e753e30c"`,
+    );
 
     // Add composite unique constraint on (post_id, project_account_id)
     await queryRunner.query(

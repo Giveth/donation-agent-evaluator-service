@@ -40,7 +40,7 @@ COPY docker-entrypoint.sh .
 RUN chmod +x docker-entrypoint.sh
 
 # Expose the application port
-EXPOSE 3000
+EXPOSE 3333
 
 # Use entrypoint to apply migrations and then start app
 ENTRYPOINT ["./docker-entrypoint.sh"]

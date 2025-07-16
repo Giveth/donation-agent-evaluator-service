@@ -113,22 +113,8 @@ export class EvaluationService {
       `📋 Project details: status=${project.status?.name}, qualityScore=${project.qualityScore}, givPowerRank=${project.givPowerRank}`,
     );
 
-    // Check if project is eligible for evaluation
-    const statusName = project.status?.name ?? 'unknown';
-    if (project.status && !this.isProjectEligible(statusName)) {
-      this.logger.warn(
-        `❌ Project ${project.id} is not eligible for evaluation (status: ${statusName})`,
-      );
-      return {
-        projectId: project.id.toString(),
-        causeScore: 0,
-        hasStoredPosts: false,
-        totalStoredPosts: 0,
-        evaluationTimestamp: new Date(),
-      };
-    }
-
-    this.logger.debug(`✅ Project ${project.id} is eligible for evaluation`);
+    // All projects are eligible for evaluation
+    this.logger.debug(`✅ Project ${project.id} proceeding with evaluation`);
 
     // Fetch stored social posts for this project (database-first approach)
     this.logger.debug(
@@ -209,14 +195,6 @@ export class EvaluationService {
     });
 
     return result;
-  }
-
-  /**
-   * Check if project is eligible for evaluation based on status
-   */
-  private isProjectEligible(status: string): boolean {
-    const eligibleStatuses = ['active', 'verified', 'draft'];
-    return eligibleStatuses.includes(status.toLowerCase());
   }
 
   /**

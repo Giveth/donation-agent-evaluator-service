@@ -227,10 +227,6 @@ export class ProjectUpdateDto {
   @IsBoolean()
   isMain?: boolean;
 
-  @IsOptional()
-  @IsNumber()
-  totalReactions?: number;
-
   constructor(data: {
     id: number;
     title: string;
@@ -238,7 +234,6 @@ export class ProjectUpdateDto {
     contentSummary?: string;
     createdAt: Date | string;
     isMain?: boolean;
-    totalReactions?: number;
   }) {
     this.id = data.id;
     this.title = data.title;
@@ -249,7 +244,6 @@ export class ProjectUpdateDto {
         ? new Date(data.createdAt)
         : data.createdAt;
     this.isMain = data.isMain;
-    this.totalReactions = data.totalReactions;
   }
 }
 
@@ -427,13 +421,6 @@ export class ProjectDetailsDto {
   status?: ProjectStatusDto;
 
   /**
-   * Whether the project is verified
-   */
-  @IsOptional()
-  @IsBoolean()
-  verified?: boolean;
-
-  /**
    * Project verification status string
    */
   @IsOptional()
@@ -467,13 +454,6 @@ export class ProjectDetailsDto {
   @IsOptional()
   @IsNumber()
   totalDonations?: number;
-
-  /**
-   * Total reactions received
-   */
-  @IsOptional()
-  @IsNumber()
-  totalReactions?: number;
 
   /**
    * Total number of project updates
@@ -622,13 +602,11 @@ export class ProjectDetailsDto {
     qualityScore?: number;
     givPowerRank?: number;
     status?: ProjectStatusDto;
-    verified?: boolean;
     verificationStatus?: string;
     isGivbackEligible?: boolean;
     giveBacks?: boolean;
     listed?: boolean;
     totalDonations?: number;
-    totalReactions?: number;
     totalProjectUpdates?: number;
     countUniqueDonors?: number;
     creationDate?: Date | string;
@@ -666,13 +644,11 @@ export class ProjectDetailsDto {
     this.qualityScore = data.qualityScore;
     this.givPowerRank = data.givPowerRank;
     this.status = data.status;
-    this.verified = data.verified;
     this.verificationStatus = data.verificationStatus;
     this.isGivbackEligible = data.isGivbackEligible;
     this.giveBacks = data.giveBacks;
     this.listed = data.listed;
     this.totalDonations = data.totalDonations;
-    this.totalReactions = data.totalReactions;
     this.totalProjectUpdates = data.totalProjectUpdates;
     this.countUniqueDonors = data.countUniqueDonors;
     this.creationDate =
@@ -802,13 +778,11 @@ export function createProjectDetailsDto(project: unknown): ProjectDetailsDto {
     qualityScore: proj.qualityScore,
     givPowerRank,
     status: proj.status ? new ProjectStatusDto(proj.status) : undefined,
-    verified: proj.verified,
     verificationStatus: proj.verificationStatus,
     isGivbackEligible: proj.isGivbackEligible,
     giveBacks: proj.giveBacks,
     listed: proj.listed,
     totalDonations: proj.totalDonations,
-    totalReactions: proj.totalReactions,
     totalProjectUpdates: proj.totalProjectUpdates,
     countUniqueDonors: proj.countUniqueDonors,
     creationDate: proj.creationDate,

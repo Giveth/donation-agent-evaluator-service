@@ -6,6 +6,10 @@
 
 set -e
 
+echo "Export SSL certificate path..."
+export PGSSLROOTCERT=/usr/src/app/db-ca.crt
+export DATABASE_SSL_REJECT_UNAUTHORIZED=true
+
 echo "[entrypoint] Running database migrations..."
 npm run migration:run
 

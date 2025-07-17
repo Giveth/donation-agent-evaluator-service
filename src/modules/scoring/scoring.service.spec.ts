@@ -83,10 +83,17 @@ describe('ScoringService', () => {
               content: JSON.stringify({
                 projectInfoQualityScore: 75,
                 socialMediaQualityScore: 80,
+                twitterQualityScore: 85,
+                farcasterQualityScore: 75,
                 relevanceToCauseScore: 90,
+                twitterRelevanceScore: 85,
+                farcasterRelevanceScore: 95,
+                projectRelevanceScore: 90,
+                evidenceOfImpactScore: 85,
                 projectInfoQualityReasoning: 'Good project description',
                 socialMediaQualityReasoning: 'Active social media presence',
                 relevanceToCauseReasoning: 'Highly relevant to cause',
+                evidenceOfImpactReasoning: 'Clear evidence of positive impact',
               }),
             },
           },
@@ -98,12 +105,13 @@ describe('ScoringService', () => {
       const result = await service.calculateCauseScore(mockInput);
 
       expect(result).toBeDefined();
-      expect(result.causeScore).toBeGreaterThan(0);
-      expect(result.causeScore).toBeLessThanOrEqual(100);
+      expect(result.finalScore).toBeGreaterThan(0);
+      expect(result.finalScore).toBeLessThanOrEqual(100);
       expect(result.breakdown).toBeDefined();
       expect(result.breakdown.projectInfoQualityScore).toBe(75);
-      expect(result.breakdown.socialMediaQualityScore).toBe(80);
-      expect(result.breakdown.relevanceToCauseScore).toBe(90);
+      expect(result.breakdown.socialMediaQualityScore).toBe(80); // (85 * 0.5) + (75 * 0.5) = 80
+      expect(result.breakdown.relevanceToCauseScore).toBe(90); // (85 * 0.33) + (95 * 0.33) + (90 * 0.34) = 90
+      expect(result.breakdown.evidenceOfImpactScore).toBe(85);
     });
 
     it('should return zero scores when LLM assessment fails', async () => {
@@ -120,7 +128,7 @@ describe('ScoringService', () => {
 
       const result = await service.calculateCauseScore(inputWithoutOtherScores);
 
-      expect(result.causeScore).toBe(0);
+      expect(result.finalScore).toBe(0);
       expect(result.breakdown.projectInfoQualityScore).toBe(0);
       expect(result.breakdown.socialMediaQualityScore).toBe(0);
       expect(result.breakdown.relevanceToCauseScore).toBe(0);
@@ -326,7 +334,13 @@ describe('ScoringService', () => {
               content: JSON.stringify({
                 projectInfoQualityScore: 100,
                 socialMediaQualityScore: 100,
+                twitterQualityScore: 100,
+                farcasterQualityScore: 100,
                 relevanceToCauseScore: 100,
+                twitterRelevanceScore: 100,
+                farcasterRelevanceScore: 100,
+                projectRelevanceScore: 100,
+                evidenceOfImpactScore: 100,
               }),
             },
           },
@@ -351,7 +365,7 @@ describe('ScoringService', () => {
       const result = await service.calculateCauseScore(input);
 
       // With all components at 100, the final score should be 100
-      expect(result.causeScore).toBe(100);
+      expect(result.finalScore).toBe(100);
     });
   });
 });

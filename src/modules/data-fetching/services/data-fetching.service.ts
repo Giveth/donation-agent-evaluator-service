@@ -260,7 +260,7 @@ export class DataFetchingService {
       website: undefined,
       youtube: undefined,
       totalRaised: project.totalDonations,
-      lastUpdateTitle: undefined,
+      lastUpdateTitle: project.lastUpdateTitle,
       mainCategory: undefined,
       subCategories: [],
       isGivbackEligible: undefined,
@@ -285,7 +285,7 @@ export class DataFetchingService {
       projectUpdate: project.lastUpdateContent
         ? {
             id: 1, // Default update ID
-            title: 'Latest Update',
+            title: project.lastUpdateTitle ?? 'Latest Update',
             content: project.lastUpdateContent,
             createdAt: project.lastUpdateDate ?? new Date(),
             isMain: true,

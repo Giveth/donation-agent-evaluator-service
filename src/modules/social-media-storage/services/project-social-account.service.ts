@@ -19,6 +19,7 @@ export interface ProjectAccountData {
   // Project update information
   lastUpdateDate?: Date;
   lastUpdateContent?: string;
+  lastUpdateTitle?: string;
 
   // Social media URLs
   xUrl?: string;
@@ -446,6 +447,9 @@ export class ProjectSocialAccountService {
     if (data.lastUpdateContent !== undefined) {
       projectAccount.lastUpdateContent = data.lastUpdateContent;
     }
+    if (data.lastUpdateTitle !== undefined) {
+      projectAccount.lastUpdateTitle = data.lastUpdateTitle;
+    }
 
     // Social media URLs
     if (data.xUrl !== undefined) {
@@ -491,6 +495,7 @@ export class ProjectSocialAccountService {
       totalDonations: data.totalDonations ?? 0,
       lastUpdateDate: data.lastUpdateDate,
       lastUpdateContent: data.lastUpdateContent,
+      lastUpdateTitle: data.lastUpdateTitle,
       xUrl: data.xUrl,
       farcasterUrl: data.farcasterUrl,
       lastXFetch: data.lastXFetch,

@@ -60,6 +60,14 @@ export class ProjectSocialAccount {
   @Column({ name: 'last_update_content', type: 'text', nullable: true })
   lastUpdateContent?: string;
 
+  @Column({
+    name: 'last_update_title',
+    type: 'varchar',
+    length: 500,
+    nullable: true,
+  })
+  lastUpdateTitle?: string;
+
   // Social media URLs
   @Column({ name: 'x_url', nullable: true })
   xUrl?: string;

@@ -5,7 +5,7 @@
  */
 export interface CauseScoreBreakdownDto {
   /**
-   * Score from project information and update quality assessment (0-20 points, 20% weight)
+   * Score from project information and update quality assessment (0-15 points, 15% weight)
    */
   projectInfoQualityScore: number;
 
@@ -15,7 +15,7 @@ export interface CauseScoreBreakdownDto {
   updateRecencyScore: number;
 
   /**
-   * Score from social media content quality assessment (0-15 points, 15% weight)
+   * Score from social media content quality assessment (0-10 points, 10% weight)
    */
   socialMediaQualityScore: number;
 
@@ -30,9 +30,14 @@ export interface CauseScoreBreakdownDto {
   socialMediaFrequencyScore: number;
 
   /**
-   * Score from project relevance to cause assessment (0-30 points, 30% weight)
+   * Score from project relevance to cause assessment (0-20 points, 20% weight)
    */
   relevanceToCauseScore: number;
+
+  /**
+   * Score from evidence of social/environmental impact assessment (0-20 points, 20% weight)
+   */
+  evidenceOfImpactScore: number;
 
   /**
    * Score from GIVpower rank assessment (0-15 points, 15% weight)

@@ -244,6 +244,7 @@ export class TwitterFetchProcessor {
       // Calculate statistics from metadata
       let recentFetches = 0;
       let totalProcessingTime = 0;
+      let validProcessingTimes = 0;
       let lastFetchTime: Date | undefined;
 
       const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -257,6 +258,7 @@ export class TwitterFetchProcessor {
         const lastResult = (project.metadata as any)?.lastFetchResult;
         if (lastResult?.processingTimeMs) {
           totalProcessingTime += lastResult.processingTimeMs;
+          validProcessingTimes++;
         }
 
         // Track most recent fetch
@@ -269,7 +271,9 @@ export class TwitterFetchProcessor {
       }
 
       const averageProcessingTime =
-        recentFetches > 0 ? Math.round(totalProcessingTime / recentFetches) : 0;
+        validProcessingTimes > 0
+          ? Math.round(totalProcessingTime / validProcessingTimes)
+          : 0;
 
       return {
         totalProjects: projectsWithTwitter.length,

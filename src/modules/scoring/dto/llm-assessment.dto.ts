@@ -24,6 +24,24 @@ export class LLMAssessmentDto {
   socialMediaQualityScore!: number;
 
   /**
+   * Twitter content quality score (0-100)
+   * Evaluates the quality of Twitter posts specifically
+   */
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  twitterQualityScore!: number;
+
+  /**
+   * Farcaster content quality score (0-100)
+   * Evaluates the quality of Farcaster posts specifically
+   */
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  farcasterQualityScore!: number;
+
+  /**
    * Relevance to cause score (0-100)
    * Evaluates how well the project aligns with the cause's mission and goals
    */
@@ -31,6 +49,42 @@ export class LLMAssessmentDto {
   @Min(0)
   @Max(100)
   relevanceToCauseScore!: number;
+
+  /**
+   * Twitter relevance to cause score (0-100)
+   * Evaluates how well Twitter posts align with the cause's mission
+   */
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  twitterRelevanceScore!: number;
+
+  /**
+   * Farcaster relevance to cause score (0-100)
+   * Evaluates how well Farcaster posts align with the cause's mission
+   */
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  farcasterRelevanceScore!: number;
+
+  /**
+   * Project data relevance to cause score (0-100)
+   * Evaluates how well project information aligns with the cause's mission
+   */
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  projectRelevanceScore!: number;
+
+  /**
+   * Evidence of social/environmental impact score (0-100)
+   * Evaluates evidence of philanthropic action in project updates and social media
+   */
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  evidenceOfImpactScore!: number;
 
   /**
    * Optional reasoning for project info quality score
@@ -53,6 +107,13 @@ export class LLMAssessmentDto {
   @IsString()
   relevanceToCauseReasoning?: string;
 
+  /**
+   * Optional reasoning for evidence of impact score
+   */
+  @IsOptional()
+  @IsString()
+  evidenceOfImpactReasoning?: string;
+
   constructor(data: Partial<LLMAssessmentDto>) {
     Object.assign(this, data);
   }
@@ -64,10 +125,17 @@ export class LLMAssessmentDto {
     return new LLMAssessmentDto({
       projectInfoQualityScore: 0,
       socialMediaQualityScore: 0,
+      twitterQualityScore: 0,
+      farcasterQualityScore: 0,
       relevanceToCauseScore: 0,
+      twitterRelevanceScore: 0,
+      farcasterRelevanceScore: 0,
+      projectRelevanceScore: 0,
+      evidenceOfImpactScore: 0,
       projectInfoQualityReasoning: 'LLM assessment failed',
       socialMediaQualityReasoning: 'LLM assessment failed',
       relevanceToCauseReasoning: 'LLM assessment failed',
+      evidenceOfImpactReasoning: 'LLM assessment failed',
     });
   }
 
@@ -77,12 +145,24 @@ export class LLMAssessmentDto {
   static createPartialAssessment(
     projectInfoScore: number,
     socialMediaScore: number,
+    twitterQualityScore: number,
+    farcasterQualityScore: number,
     relevanceScore: number,
+    twitterRelevanceScore: number,
+    farcasterRelevanceScore: number,
+    projectRelevanceScore: number,
+    evidenceOfImpactScore: number,
   ): LLMAssessmentDto {
     return new LLMAssessmentDto({
       projectInfoQualityScore: projectInfoScore,
       socialMediaQualityScore: socialMediaScore,
+      twitterQualityScore,
+      farcasterQualityScore,
       relevanceToCauseScore: relevanceScore,
+      twitterRelevanceScore,
+      farcasterRelevanceScore,
+      projectRelevanceScore,
+      evidenceOfImpactScore,
     });
   }
 }

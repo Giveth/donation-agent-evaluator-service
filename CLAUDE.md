@@ -50,14 +50,14 @@ The TwitterService uses `@the-convocation/twitter-scraper` with dual authenticat
 
 ### Scoring Rubric (Total: 100%)
 
-- Project Information & Update Quality: 20% (LLM-assessed)
+- Project Information & Update Quality: 15% (LLM-assessed)
 - Update Recency: 10% (calculated)
-- Social Media Content Quality: 20% (LLM-assessed)
+- Social Media Content Quality: 10% (LLM-assessed, split: Twitter 50%, Farcaster 50%)
 - Social Media Posting Recency: 5% (calculated)
 - Social Media Posting Frequency: 5% (calculated)
-- Relevance to Cause: 20% (LLM-assessed)
-- Existing Quality Score: 10% (from Giveth DB)
-- GIVpower Rank: 10% (from Giveth DB)
+- Relevance to Cause: 20% (LLM-assessed, split: Twitter 33%, Farcaster 33%, Project 33%)
+- Evidence of Social/Environmental Impact: 20% (LLM-assessed)
+- GIVpower Rank: 15% (from Giveth DB)
 
 ## Environment Variables
 
@@ -93,6 +93,16 @@ LLM_MODEL=google/gemini-2.5-flash
 # Giveth Backend Integration
 GIVETH_API_BASE_URL=https://api.giveth.io
 GIVETH_API_KEY=your_giveth_key
+
+# Scoring Weight Configuration (Optional - defaults are used if not specified)
+SCORING_WEIGHT_PROJECT_INFO_QUALITY=15
+SCORING_WEIGHT_UPDATE_RECENCY=10
+SCORING_WEIGHT_SOCIAL_MEDIA_QUALITY=10
+SCORING_WEIGHT_SOCIAL_MEDIA_RECENCY=5
+SCORING_WEIGHT_SOCIAL_MEDIA_FREQUENCY=5
+SCORING_WEIGHT_RELEVANCE_TO_CAUSE=20
+SCORING_WEIGHT_EVIDENCE_OF_IMPACT=20
+SCORING_WEIGHT_GIVPOWER_RANK=15
 
 ```
 

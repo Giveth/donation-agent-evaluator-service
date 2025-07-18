@@ -31,9 +31,6 @@ export class ProjectSocialAccount {
   @Column({ name: 'project_status', type: 'varchar', length: 100 })
   projectStatus: string;
 
-  @Column({ name: 'verified', type: 'boolean', default: false })
-  verified: boolean;
-
   // Project metrics
   @Column({
     name: 'quality_score',
@@ -56,15 +53,20 @@ export class ProjectSocialAccount {
   })
   totalDonations: number;
 
-  @Column({ name: 'total_reactions', type: 'integer', default: 0 })
-  totalReactions: number;
-
   // Project update information
   @Column({ name: 'last_update_date', type: 'timestamp', nullable: true })
   lastUpdateDate?: Date;
 
   @Column({ name: 'last_update_content', type: 'text', nullable: true })
   lastUpdateContent?: string;
+
+  @Column({
+    name: 'last_update_title',
+    type: 'varchar',
+    length: 500,
+    nullable: true,
+  })
+  lastUpdateTitle?: string;
 
   // Social media URLs
   @Column({ name: 'x_url', nullable: true })

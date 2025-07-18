@@ -8,7 +8,10 @@ import {
   CauseScoreBreakdownDto,
 } from './dto';
 import { LLMService } from '../llm-integration/llm.service';
-import { SocialPostDto } from '../social-media/dto/social-post.dto';
+import {
+  SocialMediaPlatform,
+  SocialPostDto,
+} from '../social-media/dto/social-post.dto';
 
 @Injectable()
 export class ScoringService {
@@ -82,21 +85,24 @@ export class ScoringService {
     try {
       // Get LLM assessments for quality and relevance
       const llmAssessment = await this.performLLMAssessment(input);
-
+      this.logger.debug('Input Log Values', input);
       // Calculate individual score components
       const breakdown: CauseScoreBreakdownDto = {
         projectInfoQualityScore: llmAssessment.projectInfoQualityScore,
         updateRecencyScore: this.calculateUpdateRecencyScore(
           input.lastUpdateDate,
         ),
-        socialMediaQualityScore: llmAssessment.socialMediaQualityScore,
+        socialMediaQualityScore:
+          this.calculatePlatformSpecificSocialMediaScore(llmAssessment),
         socialMediaRecencyScore: this.calculateSocialMediaRecencyScore(
           input.socialPosts,
         ),
         socialMediaFrequencyScore: this.calculateSocialMediaFrequencyScore(
           input.socialPosts,
         ),
-        relevanceToCauseScore: llmAssessment.relevanceToCauseScore,
+        relevanceToCauseScore:
+          this.calculatePlatformSpecificRelevanceScore(llmAssessment),
+        evidenceOfImpactScore: llmAssessment.evidenceOfImpactScore,
         givPowerRankScore: this.calculateGivPowerRankScore(
           input.givPowerRank,
           input.totalProjectCount,
@@ -126,6 +132,7 @@ export class ScoringService {
         socialMediaRecencyScore: 0,
         socialMediaFrequencyScore: 0,
         relevanceToCauseScore: 0,
+        evidenceOfImpactScore: 0,
         givPowerRankScore: 0,
       };
 
@@ -154,6 +161,14 @@ export class ScoringService {
 You will assess projects based on three criteria and provide numerical scores from 0-100 for each.
 Be objective and consistent in your scoring. Consider professionalism, clarity, impact, and engagement.`;
 
+      // Separate posts by platform for platform-specific evaluation
+      const twitterPosts = recentPosts.filter(
+        post => post.platform === SocialMediaPlatform.TWITTER,
+      );
+      const farcasterPosts = recentPosts.filter(
+        post => post.platform === SocialMediaPlatform.FARCASTER,
+      );
+
       const userPrompt = `Please evaluate the following project for a charitable cause:
 
 CAUSE INFORMATION:
@@ -171,26 +186,54 @@ Title: ${input.lastUpdateTitle ?? 'No recent update'}
 Content: ${input.lastUpdateContent ?? 'No recent update'}
 Date: ${input.lastUpdateDate?.toISOString() ?? 'Unknown'}
 
-RECENT SOCIAL MEDIA POSTS:
-${recentPosts.length > 0 ? JSON.stringify(recentPosts, null, 2) : 'No recent social media activity'}
+TWITTER POSTS:
+${twitterPosts.length > 0 ? JSON.stringify(twitterPosts, null, 2) : 'No recent Twitter activity'}
+
+FARCASTER POSTS:
+${farcasterPosts.length > 0 ? JSON.stringify(farcasterPosts, null, 2) : 'No recent Farcaster activity'}
 
 Please provide scores for:
 
 1. PROJECT INFO QUALITY (0-100): Evaluate the quality, completeness, and professionalism of the project description and updates. Consider clarity, detail, transparency, and communication quality.
 
-2. SOCIAL MEDIA QUALITY (0-100): Evaluate the quality of social media content. Consider engagement, professionalism, frequency of updates, and value provided to followers. If no social media activity, score 0.
+2. SOCIAL MEDIA QUALITY (0-100): Overall social media content quality score (combination of Twitter and Farcaster).
 
-3. RELEVANCE TO CAUSE (0-100): Evaluate how well the project aligns with the cause's mission and goals. Consider direct impact, thematic alignment, and contribution to the cause's objectives.
+3. TWITTER QUALITY (0-100): Evaluate the quality of Twitter content specifically. Consider engagement, professionalism, and value provided. If no Twitter activity, score 0.
+
+4. FARCASTER QUALITY (0-100): Evaluate the quality of Farcaster content specifically. Consider engagement, professionalism, and value provided. If no Farcaster activity, score 0.
+
+5. RELEVANCE TO CAUSE (0-100): Overall relevance score (combination of project data, Twitter, and Farcaster).
+
+6. TWITTER RELEVANCE (0-100): Evaluate how well Twitter posts align with the cause's mission and goals. If no Twitter activity, score 0.
+
+7. FARCASTER RELEVANCE (0-100): Evaluate how well Farcaster posts align with the cause's mission and goals. If no Farcaster activity, score 0.
+
+8. PROJECT RELEVANCE (0-100): Evaluate how well the project information aligns with the cause's mission and goals based on project description and updates.
+
+9. EVIDENCE OF IMPACT (0-100): Evaluate evidence of social/environmental impact or philanthropic action demonstrated in project updates, Twitter posts, and Farcaster posts. Look for concrete examples of positive impact, beneficiaries helped, or meaningful change created.
 
 Respond in JSON format:
 {
   "projectInfoQualityScore": <number>,
   "socialMediaQualityScore": <number>,
+  "twitterQualityScore": <number>,
+  "farcasterQualityScore": <number>,
   "relevanceToCauseScore": <number>,
+  "twitterRelevanceScore": <number>,
+  "farcasterRelevanceScore": <number>,
+  "projectRelevanceScore": <number>,
+  "evidenceOfImpactScore": <number>,
   "projectInfoQualityReasoning": "<brief explanation>",
   "socialMediaQualityReasoning": "<brief explanation>",
-  "relevanceToCauseReasoning": "<brief explanation>"
+  "relevanceToCauseReasoning": "<brief explanation>",
+  "evidenceOfImpactReasoning": "<brief explanation>"
 }`;
+
+      // Log the full prompt being sent to LLM
+      this.logger.log('=== LLM PROMPT BEING SENT ===');
+      this.logger.log('System Prompt:', systemPrompt);
+      this.logger.log('User Prompt:', userPrompt);
+      this.logger.log('=== END LLM PROMPT ===');
 
       const response = await this.llmService.createChatCompletion(
         [
@@ -208,6 +251,11 @@ Respond in JSON format:
       if (!content) {
         throw new Error('No response from LLM');
       }
+
+      // Log the full LLM response
+      this.logger.log('=== LLM RESPONSE RECEIVED ===');
+      this.logger.log('Raw Response:', content);
+      this.logger.log('=== END LLM RESPONSE ===');
 
       const assessment = JSON.parse(content) as LLMAssessmentDto;
       return new LLMAssessmentDto(assessment);
@@ -305,6 +353,42 @@ Respond in JSON format:
   }
 
   /**
+   * Calculate platform-specific social media quality score
+   * Twitter 50%, Farcaster 50%
+   */
+  private calculatePlatformSpecificSocialMediaScore(
+    llmAssessment: LLMAssessmentDto,
+  ): number {
+    const twitterWeight = 0.5;
+    const farcasterWeight = 0.5;
+
+    const platformSpecificScore =
+      llmAssessment.twitterQualityScore * twitterWeight +
+      llmAssessment.farcasterQualityScore * farcasterWeight;
+
+    return Math.round(Math.max(0, Math.min(100, platformSpecificScore)));
+  }
+
+  /**
+   * Calculate platform-specific relevance to cause score
+   * Twitter 33%, Farcaster 33%, Project 33%
+   */
+  private calculatePlatformSpecificRelevanceScore(
+    llmAssessment: LLMAssessmentDto,
+  ): number {
+    const twitterWeight = 0.33;
+    const farcasterWeight = 0.33;
+    const projectWeight = 0.34; // 0.34 to ensure total is 1.0
+
+    const platformSpecificScore =
+      llmAssessment.twitterRelevanceScore * twitterWeight +
+      llmAssessment.farcasterRelevanceScore * farcasterWeight +
+      llmAssessment.projectRelevanceScore * projectWeight;
+
+    return Math.round(Math.max(0, Math.min(100, platformSpecificScore)));
+  }
+
+  /**
    * Calculate the weighted total score
    */
   private calculateWeightedScore(breakdown: CauseScoreBreakdownDto): number {
@@ -317,6 +401,7 @@ Respond in JSON format:
       breakdown.socialMediaRecencyScore * weights.socialMediaRecency +
       breakdown.socialMediaFrequencyScore * weights.socialMediaFrequency +
       breakdown.relevanceToCauseScore * weights.relevanceToCause +
+      breakdown.evidenceOfImpactScore * weights.evidenceOfImpact +
       breakdown.givPowerRankScore * weights.givPowerRank;
 
     return Math.round(Math.max(0, Math.min(100, weightedScore)));
@@ -359,6 +444,9 @@ Respond in JSON format:
           ) || undefined,
         relevanceToCause:
           Number(this.configService.get('SCORING_WEIGHT_RELEVANCE_TO_CAUSE')) ||
+          undefined,
+        evidenceOfImpact:
+          Number(this.configService.get('SCORING_WEIGHT_EVIDENCE_OF_IMPACT')) ||
           undefined,
         givPowerRank:
           Number(this.configService.get('SCORING_WEIGHT_GIVPOWER_RANK')) ||

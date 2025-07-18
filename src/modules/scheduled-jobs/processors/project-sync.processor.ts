@@ -381,7 +381,6 @@ export class ProjectSyncProcessor {
 
         // Project status and verification
         projectStatus: project.status?.name ?? 'UNKNOWN',
-        verified: project.verified ?? false,
 
         // Update information
         lastUpdateDate: project.lastUpdateDate,
@@ -389,7 +388,6 @@ export class ProjectSyncProcessor {
 
         // Financial and engagement metrics
         totalDonations: project.totalDonations,
-        totalReactions: project.totalReactions,
 
         // Social media URLs
         xUrl: socialMediaHandles.X,
@@ -405,7 +403,6 @@ export class ProjectSyncProcessor {
           categories: project.categories?.map(cat => cat.name) ?? [],
           mainCategory: project.mainCategory,
           subCategories: project.subCategories ?? [],
-          verified: project.verified,
           giveBacks: project.giveBacks,
           isGivbackEligible: project.isGivbackEligible,
           creationDate: project.creationDate,

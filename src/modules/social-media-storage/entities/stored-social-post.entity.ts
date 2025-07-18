@@ -10,14 +10,14 @@ import {
 import { ProjectSocialAccount } from './project-social-account.entity';
 
 @Entity('stored_social_posts')
-@Index(['postId'], { unique: true })
+@Index(['postId', 'projectAccountId'], { unique: true })
 @Index(['postTimestamp'])
 @Index(['projectAccountId', 'postTimestamp'])
 export class StoredSocialPost {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ name: 'post_id', unique: true })
+  @Column({ name: 'post_id' })
   postId: string;
 
   @Column({ name: 'content', type: 'text' })

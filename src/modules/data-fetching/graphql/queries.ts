@@ -18,14 +18,12 @@ export const PROJECT_BY_SLUG_QUERY = gql`
       latestUpdateCreationDate
       image
       impactLocation
-      verified
       verificationStatus
       isImported
       giveBacks
       qualityScore
       totalDonations
       totalTraceDonations
-      totalReactions
       totalProjectUpdates
       countUniqueDonors
       listed
@@ -82,7 +80,6 @@ export const PROJECT_BY_SLUG_QUERY = gql`
         contentSummary
         createdAt
         isMain
-        totalReactions
       }
 
       # Latest project update
@@ -93,7 +90,6 @@ export const PROJECT_BY_SLUG_QUERY = gql`
         contentSummary
         createdAt
         isMain
-        totalReactions
       }
 
       # Power ranking information
@@ -195,7 +191,6 @@ export const PROJECTS_BY_SLUGS_QUERY = gql`
         slug
         description
         descriptionSummary
-        verified
         projectType
         status {
           id
@@ -204,7 +199,6 @@ export const PROJECTS_BY_SLUGS_QUERY = gql`
         }
         qualityScore
         totalDonations
-        totalReactions
         totalProjectUpdates
         updatedAt
         latestUpdateCreationDate
@@ -255,7 +249,6 @@ export const PROJECT_UPDATES_QUERY = gql`
       contentSummary
       createdAt
       isMain
-      totalReactions
       projectId
       userId
     }
@@ -302,14 +295,12 @@ export const ALL_CAUSES_WITH_PROJECTS_QUERY = gql`
         latestUpdateCreationDate
         image
         impactLocation
-        verified
         verificationStatus
         isImported
         giveBacks
         qualityScore
         totalDonations
         totalTraceDonations
-        totalReactions
         totalProjectUpdates
         countUniqueDonors
         listed
@@ -364,7 +355,6 @@ export const ALL_CAUSES_WITH_PROJECTS_QUERY = gql`
           contentSummary
           createdAt
           isMain
-          totalReactions
         }
 
         # Power ranking information
@@ -514,10 +504,8 @@ export const ALL_PROJECTS_WITH_FILTERS_QUERY = gql`
         description
         descriptionSummary
         projectType
-        verified
         qualityScore
         totalDonations
-        totalReactions
         countUniqueDonors
         latestUpdateCreationDate
         updatedAt
@@ -534,7 +522,6 @@ export const ALL_PROJECTS_WITH_FILTERS_QUERY = gql`
           contentSummary
           createdAt
           isMain
-          totalReactions
         }
 
         # Categories for relevance assessment

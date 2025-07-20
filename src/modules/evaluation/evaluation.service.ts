@@ -104,22 +104,11 @@ export class EvaluationService {
   ): Promise<ScoredProjectDto> {
     this.logger.debug(`Evaluating project ${project.id} (${project.title})`);
 
-    // Check if project is eligible for evaluation
-    const statusName = project.status?.name ?? 'unknown';
-    if (project.status && !this.isProjectEligible(statusName)) {
-      this.logger.warn(
-        `Project ${project.id} is not eligible for evaluation (status: ${statusName})`,
-      );
-      return {
-        projectId: project.id.toString(),
-        causeScore: 0,
-        hasStoredPosts: false,
-        totalStoredPosts: 0,
-        evaluationTimestamp: new Date(),
-      };
-    }
+    // All projects are eligible for evaluation
+    this.logger.debug(`Project ${project.id} proceeding with evaluation`);
 
     // Fetch stored social posts for this project (database-first approach)
+
     const [twitterPosts, farcasterPosts] = await Promise.all([
       this.socialPostStorageService.getRecentSocialPosts(
         project.id.toString(),
@@ -165,7 +154,7 @@ export class EvaluationService {
     const { finalScore, breakdown } =
       await this.scoringService.calculateCauseScore(scoringInput);
 
-    return {
+    const result = {
       projectId: project.id.toString(),
       causeScore: finalScore,
       scoreBreakdown: breakdown,
@@ -174,14 +163,15 @@ export class EvaluationService {
       lastPostDate,
       evaluationTimestamp: new Date(),
     };
-  }
 
-  /**
-   * Check if project is eligible for evaluation based on status
-   */
-  private isProjectEligible(status: string): boolean {
-    const eligibleStatuses = ['active', 'verified', 'draft'];
-    return eligibleStatuses.includes(status.toLowerCase());
+    this.logger.debug(`Project ${project.id} evaluation complete:`, {
+      causeScore: result.causeScore,
+      hasBreakdown: !!result.scoreBreakdown,
+      hasStoredPosts: result.hasStoredPosts,
+      totalStoredPosts: result.totalStoredPosts,
+    });
+
+    return result;
   }
 
   /**
@@ -205,6 +195,7 @@ export class EvaluationService {
     return {
       data: scoredProjects,
       status: 'success',
+      causeId: request.cause.id,
       totalProjects: scoredProjects.length,
       projectsWithStoredPosts,
       evaluationDuration: duration,
@@ -247,7 +238,7 @@ export class EvaluationService {
             `Cause ${causeRequest.cause.id} evaluation completed successfully`,
           );
         } catch (error) {
-          causeResult.error = error.message || 'Unknown error occurred';
+          causeResult.error = error.message ?? 'Unknown error occurred';
           causeResult.success = false;
 
           this.logger.error(
@@ -268,12 +259,12 @@ export class EvaluationService {
     const failedCauses = causeResults.filter(r => !r.success);
 
     const totalProjects = successfulCauses.reduce(
-      (sum, r) => sum + (r.result?.totalProjects || 0),
+      (sum, r) => sum + (r.result?.totalProjects ?? 0),
       0,
     );
 
     const totalProjectsWithStoredPosts = successfulCauses.reduce(
-      (sum, r) => sum + (r.result?.projectsWithStoredPosts || 0),
+      (sum, r) => sum + (r.result?.projectsWithStoredPosts ?? 0),
       0,
     );
 

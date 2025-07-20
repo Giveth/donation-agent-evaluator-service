@@ -2,6 +2,7 @@
 /dist
 /node_modules
 /build
+*.tsbuildinfo
 
 # Logs
 logs
@@ -60,3 +61,5 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 /rules
 twitter_cookies.json
 .mcp.json
+
+*.crt

@@ -1,0 +1,73 @@
+name: main-pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  code-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: Run code quality checks (lint & format)
+        run: npm run code:check
+  publish:
+    needs: code-quality
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Login to GitHub Container Registry
+        run: echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+      - name: Build image and push to GitHub Packages
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          no-cache: true
+          repository: giveth/donation-agent-evaluator-service
+          tags: |
+            ghcr.io/giveth/donation-agent-evaluator-service:latest
+
+  deploy:
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH and Redeploy
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USERNAME }}
+          key: ${{ secrets.STAGING_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          script: |
+            cd donation-agent-evaluator-service
+            git checkout main
+            git pull
+            docker compose -f docker-compose-production.yml down
+            docker compose -f docker-compose-production.yml pull
+            docker compose -f docker-compose-production.yml up -d donation-agent-evaluator-service
+            docker image prune -a --force
+            sleep 20
+            docker logs donation-agent-evaluator-service

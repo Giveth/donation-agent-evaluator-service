@@ -10,6 +10,7 @@ import {
   ALL_CAUSES_WITH_PROJECTS_QUERY,
   CAUSE_BY_ID_QUERY,
   ALL_PROJECTS_WITH_FILTERS_QUERY,
+  BULK_UPDATE_CAUSE_PROJECT_EVALUATION_MUTATION,
 } from '../graphql/queries';
 import {
   ProjectDetailsDto,
@@ -21,6 +22,10 @@ import {
   createCauseDetailsDto,
   createCauseProjectSlugsDto,
 } from '../dto/cause-details.dto';
+import {
+  UpdateCauseProjectEvaluationDto,
+  BulkUpdateCauseProjectEvaluationResponse,
+} from '../dto/update-cause-project-evaluation.dto';
 
 /**
  * Type definitions for GraphQL responses
@@ -515,6 +520,88 @@ export class ImpactGraphService {
       );
       throw new HttpException(
         'Failed to fetch project slugs from causes',
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    }
+  }
+
+  /**
+   * Bulk update cause project evaluation scores in Impact Graph
+   * Sends evaluation results back to Impact Graph after evaluation completion
+   * @param updates - Array of cause project evaluation updates
+   * @returns Array of updated cause project records
+   */
+  async bulkUpdateCauseProjectEvaluation(
+    updates: UpdateCauseProjectEvaluationDto[],
+  ): Promise<BulkUpdateCauseProjectEvaluationResponse[]> {
+    try {
+      if (updates.length === 0) {
+        this.logger.warn(
+          'No updates provided for bulk cause project evaluation',
+        );
+        return [];
+      }
+
+      this.logger.log(
+        `Sending bulk update for ${updates.length} cause project evaluations to Impact Graph`,
+        {
+          updates: updates.map(u => ({
+            causeId: u.causeId,
+            projectId: u.projectId,
+            causeScore: u.causeScore,
+          })),
+        },
+      );
+
+      const variables = {
+        updates: updates.map(update => ({
+          causeId: update.causeId,
+          projectId: update.projectId,
+          causeScore: update.causeScore,
+        })),
+      };
+
+      const response = await this.graphqlClient.request<{
+        bulkUpdateCauseProjectEvaluation: BulkUpdateCauseProjectEvaluationResponse[];
+      }>(BULK_UPDATE_CAUSE_PROJECT_EVALUATION_MUTATION, variables);
+
+      const updatedRecords = response.bulkUpdateCauseProjectEvaluation;
+
+      this.logger.log(
+        `Successfully updated ${updatedRecords.length} cause project evaluations in Impact Graph`,
+        {
+          updatedRecords: updatedRecords.map(record => ({
+            id: record.id,
+            causeId: record.causeId,
+            projectId: record.projectId,
+            causeScore: record.causeScore,
+          })),
+        },
+      );
+
+      return updatedRecords;
+    } catch (error) {
+      this.logger.error(
+        'Failed to bulk update cause project evaluations in Impact Graph',
+        {
+          error: error instanceof Error ? error.message : String(error),
+          updatesCount: updates.length,
+          updates: updates.map(u => ({
+            causeId: u.causeId,
+            projectId: u.projectId,
+            causeScore: u.causeScore,
+          })),
+        },
+      );
+
+      this.handleGraphQLError(
+        error as GraphQLError,
+        'bulkUpdateCauseProjectEvaluation',
+      );
+
+      // Re-throw the error to let the calling service handle it
+      throw new HttpException(
+        'Failed to update cause project evaluations in Impact Graph',
         HttpStatus.SERVICE_UNAVAILABLE,
       );
     }

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import pLimit from 'p-limit';
 import { DataFetchingService } from '../data-fetching/services/data-fetching.service';
+import { ImpactGraphService } from '../data-fetching/services/impact-graph.service';
 import { SocialPostStorageService } from '../social-media-storage/services/social-post-storage.service';
 import { SocialMediaPlatform } from '../social-media/dto/social-post.dto';
 import { ProjectDetailsDto } from '../data-fetching/dto/project-details.dto';
@@ -18,6 +19,10 @@ import {
 } from './dto/multi-cause-evaluation-result.dto';
 import { ScoringService } from '../scoring/scoring.service';
 import { ProjectScoreInputsDto } from '../scoring/dto';
+import {
+  UpdateCauseProjectEvaluationDto,
+  createUpdateCauseProjectEvaluationDto,
+} from '../data-fetching/dto/update-cause-project-evaluation.dto';
 
 @Injectable()
 export class EvaluationService {
@@ -26,6 +31,7 @@ export class EvaluationService {
 
   constructor(
     private readonly dataFetchingService: DataFetchingService,
+    private readonly impactGraphService: ImpactGraphService,
     private readonly socialPostStorageService: SocialPostStorageService,
     private readonly scoringService: ScoringService,
   ) {}
@@ -48,7 +54,6 @@ export class EvaluationService {
     );
 
     const scoredProjects: ScoredProjectDto[] = [];
-    let projectsWithStoredPosts = 0;
 
     try {
       // Fetch project details from local database first, fallback to GraphQL
@@ -59,10 +64,6 @@ export class EvaluationService {
         try {
           const scoredProject = await this.evaluateProject(project, cause);
           scoredProjects.push(scoredProject);
-
-          if (scoredProject.hasStoredPosts) {
-            projectsWithStoredPosts++;
-          }
         } catch (error) {
           this.logger.error(`Failed to evaluate project ${project.id}:`, error);
           // Continue with other projects, add zero-score entry
@@ -75,28 +76,35 @@ export class EvaluationService {
           });
         }
       }
-
-      // Sort by causeScore in descending order
-      scoredProjects.sort((a, b) => b.causeScore - a.causeScore);
-
-      const duration = Date.now() - startTime;
-      this.logger.log(
-        `Completed evaluation for cause ${cause.id} in ${duration}ms. ` +
-          `${projectsWithStoredPosts}/${scoredProjects.length} projects had stored posts.`,
-      );
-
-      return scoredProjects;
     } catch (error) {
       this.logger.error(
-        `Failed to evaluate projects for cause ${cause.id}:`,
+        `Failed to fetch projects for cause ${cause.id}:`,
         error,
       );
       throw error;
     }
+
+    // Sort by causeScore in descending order
+    scoredProjects.sort((a, b) => b.causeScore - a.causeScore);
+
+    const duration = Date.now() - startTime;
+    const projectsWithStoredPosts = scoredProjects.filter(
+      p => p.hasStoredPosts,
+    ).length;
+    this.logger.log(
+      `Completed evaluation for cause ${cause.id} in ${duration}ms. ` +
+        `${projectsWithStoredPosts}/${scoredProjects.length} projects had stored posts.`,
+    );
+
+    return scoredProjects;
   }
 
   /**
-   * Evaluates a single project using stored social posts
+   * Evaluates a single project against a cause using stored social posts
+   *
+   * @param project - The project details
+   * @param cause - The cause context
+   * @returns Promise<ScoredProjectDto> - The scored project
    */
   private async evaluateProject(
     project: ProjectDetailsDto,
@@ -147,7 +155,7 @@ export class EvaluationService {
       causeTitle: cause.title,
       causeDescription: cause.description,
       // Note: causeMainCategory and causeSubCategories would need to be fetched
-      // from the full cause details if needed for more accurate scoring
+      // from the cause if available in the Impact-Graph schema
     });
 
     // Calculate scores using the scoring service
@@ -192,7 +200,7 @@ export class EvaluationService {
       p => p.hasStoredPosts,
     ).length;
 
-    return {
+    const result = {
       data: scoredProjects,
       status: 'success',
       causeId: request.cause.id,
@@ -201,6 +209,11 @@ export class EvaluationService {
       evaluationDuration: duration,
       timestamp: new Date(),
     };
+
+    // Send evaluation results to Impact Graph (non-blocking)
+    this.sendEvaluationToImpactGraph(request.cause.id, scoredProjects);
+
+    return result;
   }
 
   /**
@@ -291,5 +304,100 @@ export class EvaluationService {
     );
 
     return result;
+  }
+
+  /**
+   * Sends evaluation results to Impact Graph (non-blocking operation)
+   * This method runs asynchronously and logs success/failure without affecting the main evaluation flow
+   *
+   * @param causeId - The cause ID for the evaluation
+   * @param scoredProjects - Array of scored projects from the evaluation
+   */
+  private sendEvaluationToImpactGraph(
+    causeId: number,
+    scoredProjects: ScoredProjectDto[],
+  ): void {
+    // Run asynchronously without blocking the main evaluation response
+    (async () => {
+      try {
+        if (scoredProjects.length === 0) {
+          this.logger.debug(
+            `No scored projects to send to Impact Graph for cause ${causeId}`,
+          );
+          return;
+        }
+
+        // Transform evaluation results to Impact Graph format
+        const updates: UpdateCauseProjectEvaluationDto[] = [];
+
+        for (const project of scoredProjects) {
+          try {
+            const update = createUpdateCauseProjectEvaluationDto(
+              causeId,
+              project.projectId,
+              project.causeScore,
+            );
+            updates.push(update);
+          } catch (error) {
+            this.logger.warn(
+              `Failed to transform project ${project.projectId} for Impact Graph: ${
+                error instanceof Error ? error.message : String(error)
+              }`,
+            );
+          }
+        }
+
+        if (updates.length === 0) {
+          this.logger.warn(
+            `No valid updates to send to Impact Graph for cause ${causeId}`,
+          );
+          return;
+        }
+
+        this.logger.log(
+          `Sending ${updates.length} evaluation updates to Impact Graph for cause ${causeId}`,
+          {
+            causeId,
+            projectCount: updates.length,
+            averageScore:
+              updates.reduce((sum, u) => sum + u.causeScore, 0) /
+              updates.length,
+          },
+        );
+
+        // Send updates to Impact Graph
+        const response =
+          await this.impactGraphService.bulkUpdateCauseProjectEvaluation(
+            updates,
+          );
+
+        this.logger.log(
+          `Successfully sent evaluation results to Impact Graph for cause ${causeId}`,
+          {
+            causeId,
+            updatedRecords: response.length,
+            updates: response.map(r => ({
+              id: r.id,
+              projectId: r.projectId,
+              causeScore: r.causeScore,
+            })),
+          },
+        );
+      } catch (error) {
+        this.logger.error(
+          `Failed to send evaluation results to Impact Graph for cause ${causeId}`,
+          {
+            error: error instanceof Error ? error.message : String(error),
+            causeId,
+            projectCount: scoredProjects.length,
+          },
+        );
+      }
+    })().catch(error => {
+      this.logger.error(
+        `Unexpected error in Impact Graph integration for cause ${causeId}`,
+        error,
+      );
+    });
   }
 }

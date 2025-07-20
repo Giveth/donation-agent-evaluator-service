@@ -591,3 +591,20 @@ export const ALL_PROJECTS_WITH_FILTERS_QUERY = gql`
     }
   }
 `;
+
+/**
+ * Mutation to bulk update cause project evaluation scores
+ * Used to send evaluation results back to Impact Graph after evaluation completion
+ */
+export const BULK_UPDATE_CAUSE_PROJECT_EVALUATION_MUTATION = gql`
+  mutation BulkUpdateCauseProjectEvaluation(
+    $updates: [UpdateCauseProjectEvaluationInput!]!
+  ) {
+    bulkUpdateCauseProjectEvaluation(updates: $updates) {
+      id
+      causeId
+      projectId
+      causeScore
+    }
+  }
+`;

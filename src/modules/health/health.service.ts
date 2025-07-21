@@ -1,5 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
-import { Logger } from 'nestjs-pino';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TypeOrmHealthIndicator, HttpHealthIndicator } from '@nestjs/terminus';
 import { Cache } from 'cache-manager';
@@ -36,11 +35,11 @@ export interface DetailedHealthReport {
 
 @Injectable()
 export class HealthService {
+  private readonly logger = new Logger(HealthService.name);
   private readonly healthCheckTimeout: number;
   private readonly startTime: number;
 
   constructor(
-    private readonly logger: Logger,
     private readonly typeOrmHealthIndicator: TypeOrmHealthIndicator,
     private readonly httpHealthIndicator: HttpHealthIndicator,
     private readonly configService: ConfigService,

@@ -1,4 +1,4 @@
-import { Module, MiddlewareConsumer, NestModule, Logger } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import {
   ConfigModule as NestConfigModule,
   ConfigService,
@@ -10,7 +10,6 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigModule } from './core/config/config.module';
 import { CacheModule } from './core/cache/cache.module';
-import { LoggerModule, CorrelationIdMiddleware } from './core/logger';
 import { SocialMediaModule } from './modules/social-media/social-media.module';
 import { SocialMediaStorageModule } from './modules/social-media-storage/social-media-storage.module';
 import { ScheduledJobsModule } from './modules/scheduled-jobs/scheduled-jobs.module';
@@ -24,7 +23,6 @@ import { HealthModule } from './modules/health/health.module';
   imports: [
     ConfigModule,
     CacheModule,
-    LoggerModule,
     ScheduleModule.forRoot(),
     TypeOrmModule.forRootAsync({
       imports: [NestConfigModule],
@@ -66,7 +64,6 @@ import { HealthModule } from './modules/health/health.module';
         ssl:
           configService.get('NODE_ENV') === 'production'
             ? (() => {
-                const logger = new Logger('DatabaseSSL');
                 const sslConfig: { rejectUnauthorized: boolean; ca?: string } =
                   {
                     rejectUnauthorized:
@@ -76,37 +73,43 @@ import { HealthModule } from './modules/health/health.module';
 
                 // Add CA certificate if available
                 const caCertPath = configService.get('PGSSLROOTCERT');
-                logger.debug('PGSSLROOTCERT environment variable', {
+                console.log(
+                  'DEBUG: PGSSLROOTCERT environment variable:',
                   caCertPath,
-                  currentWorkingDirectory: process.cwd(),
-                  sslEnvVars: {
-                    PGSSLROOTCERT: process.env.PGSSLROOTCERT,
-                    DATABASE_SSL_REJECT_UNAUTHORIZED:
-                      process.env.DATABASE_SSL_REJECT_UNAUTHORIZED,
-                    NODE_ENV: process.env.NODE_ENV,
-                  },
+                );
+                console.log('DEBUG: Current working directory:', process.cwd());
+                console.log('DEBUG: All SSL-related env vars:', {
+                  PGSSLROOTCERT: process.env.PGSSLROOTCERT,
+                  DATABASE_SSL_REJECT_UNAUTHORIZED:
+                    process.env.DATABASE_SSL_REJECT_UNAUTHORIZED,
+                  NODE_ENV: process.env.NODE_ENV,
                 });
 
                 if (caCertPath && fs.existsSync(caCertPath)) {
                   try {
-                    logger.debug('Reading CA certificate from path', {
+                    console.log(
+                      'DEBUG: Reading CA certificate from:',
                       caCertPath,
-                    });
+                    );
                     sslConfig.ca = fs.readFileSync(caCertPath, 'utf8');
-                    logger.log('CA certificate loaded successfully', {
-                      certificateLength: sslConfig.ca.length,
-                    });
+                    console.log(
+                      'DEBUG: CA certificate loaded successfully, length:',
+                      sslConfig.ca.length,
+                    );
                   } catch (error) {
-                    logger.warn('Failed to read SSL CA certificate', {
-                      error: (error as Error).message,
-                      caCertPath,
-                    });
+                    console.warn(
+                      'Failed to read SSL CA certificate:',
+                      (error as Error).message,
+                    );
                   }
                 } else {
-                  logger.warn('CA certificate file not found or path empty', {
-                    path: caCertPath,
-                    exists: caCertPath ? fs.existsSync(caCertPath) : false,
-                  });
+                  console.warn(
+                    'DEBUG: CA certificate file not found or path empty:',
+                    {
+                      path: caCertPath,
+                      exists: caCertPath ? fs.existsSync(caCertPath) : false,
+                    },
+                  );
                 }
 
                 return sslConfig;
@@ -173,8 +176,4 @@ import { HealthModule } from './modules/health/health.module';
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule implements NestModule {
-  configure(consumer: MiddlewareConsumer) {
-    consumer.apply(CorrelationIdMiddleware).forRoutes('*');
-  }
-}
+export class AppModule {}

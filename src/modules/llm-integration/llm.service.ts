@@ -1,5 +1,4 @@
-import { Injectable } from '@nestjs/common';
-import { Logger } from 'nestjs-pino';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 import {
@@ -23,13 +22,11 @@ import {
 
 @Injectable()
 export class LLMService {
+  private readonly logger = new Logger(LLMService.name);
   private readonly openai: OpenAI;
   private readonly defaultModel: string;
 
-  constructor(
-    private readonly logger: Logger,
-    private readonly configService: ConfigService,
-  ) {
+  constructor(private readonly configService: ConfigService) {
     const apiKey = this.configService.get<string>('OPENROUTER_API_KEY');
     if (!apiKey) {
       throw new Error('OPENROUTER_API_KEY is not configured');

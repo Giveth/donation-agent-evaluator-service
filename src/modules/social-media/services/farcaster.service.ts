@@ -1,4 +1,5 @@
-import { Injectable, Logger, Inject } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
+import { Logger } from 'nestjs-pino';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
@@ -51,10 +52,10 @@ import { AxiosError } from 'axios';
  */
 @Injectable()
 export class FarcasterService {
-  private readonly logger = new Logger(FarcasterService.name);
   private readonly config: FarcasterConfig;
 
   constructor(
+    private readonly logger: Logger,
     private readonly configService: ConfigService,
     private readonly httpService: HttpService,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,

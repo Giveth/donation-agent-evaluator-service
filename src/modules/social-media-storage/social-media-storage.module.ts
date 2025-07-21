@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { LoggerModule } from '../../core/logger/logger.module';
 import { ProjectSocialAccount } from './entities/project-social-account.entity';
 import { StoredSocialPost } from './entities/stored-social-post.entity';
 import { ScheduledJob } from './entities/scheduled-job.entity';
@@ -13,6 +14,7 @@ import { ProjectSocialAccountService } from './services/project-social-account.s
       StoredSocialPost,
       ScheduledJob,
     ]),
+    LoggerModule,
   ],
   providers: [SocialPostStorageService, ProjectSocialAccountService],
   exports: [SocialPostStorageService, ProjectSocialAccountService],

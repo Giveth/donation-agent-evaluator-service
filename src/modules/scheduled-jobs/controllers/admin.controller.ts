@@ -5,8 +5,8 @@ import {
   Param,
   HttpStatus,
   HttpException,
-  Logger,
 } from '@nestjs/common';
+import { Logger } from 'nestjs-pino';
 import { v4 as uuidv4 } from 'uuid';
 import { JobSchedulerService } from '../services/job-scheduler.service';
 import { JobProcessorService } from '../services/job-processor.service';
@@ -35,9 +35,8 @@ import { SocialMediaPlatform } from '../../social-media/dto/social-post.dto';
  */
 @Controller('admin')
 export class AdminController {
-  private readonly logger = new Logger(AdminController.name);
-
   constructor(
+    private readonly logger: Logger,
     private readonly jobSchedulerService: JobSchedulerService,
     private readonly jobProcessorService: JobProcessorService,
     private readonly projectSyncProcessor: ProjectSyncProcessor,

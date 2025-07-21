@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
-import { ValidationPipe, Logger } from '@nestjs/common';
+import { ValidationPipe } from '@nestjs/common';
+import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './core/common/exceptions/global-exception.filter';
 import helmet from 'helmet';
@@ -12,10 +13,15 @@ import {
   type NextFunction,
 } from 'express';
 
-const logger = new Logger('Bootstrap');
+// Logger will be initialized after app creation to use Pino
+let logger: Logger;
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+
+  // Initialize Pino logger
+  logger = app.get(Logger);
+  app.useLogger(logger);
 
   // Get ConfigService for environment variables
   const configService = app.get(ConfigService);
@@ -131,7 +137,7 @@ async function bootstrap() {
   );
 
   // Register global exception filter
-  app.useGlobalFilters(new GlobalExceptionFilter());
+  app.useGlobalFilters(new GlobalExceptionFilter(logger));
 
   // ===========================================
   // GRACEFUL SHUTDOWN HANDLERS
@@ -139,18 +145,21 @@ async function bootstrap() {
 
   // Handle graceful shutdown
   const gracefulShutdown = async (signal: string) => {
-    logger.log(`Received ${signal}, starting graceful shutdown...`);
+    logger.log(
+      `Received ${signal}, starting graceful shutdown...`,
+      'Bootstrap',
+    );
 
     try {
       // Close HTTP server
       await app.close();
-      logger.log('HTTP server closed');
+      logger.log('HTTP server closed', 'Bootstrap');
 
       // Additional cleanup if needed
-      logger.log('Graceful shutdown completed');
+      logger.log('Graceful shutdown completed', 'Bootstrap');
       process.exit(0);
     } catch (error) {
-      logger.error('Error during graceful shutdown:', error);
+      logger.error('Error during graceful shutdown:', error, 'Bootstrap');
       process.exit(1);
     }
   };
@@ -161,13 +170,19 @@ async function bootstrap() {
 
   // Handle uncaught exceptions
   process.on('uncaughtException', error => {
-    logger.error('Uncaught Exception:', error);
+    logger.error('Uncaught Exception:', error, 'Bootstrap');
     process.exit(1);
   });
 
   // Handle unhandled promise rejections
   process.on('unhandledRejection', (reason, promise) => {
-    logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    logger.error(
+      'Unhandled Rejection at:',
+      promise,
+      'reason:',
+      reason,
+      'Bootstrap',
+    );
     process.exit(1);
   });
 
@@ -176,14 +191,19 @@ async function bootstrap() {
   // ===========================================
 
   await app.listen(port);
-  logger.log(`Application is running on port ${port} in ${nodeEnv} mode`);
-  logger.log(`CORS enabled for origins: ${corsOrigins}`);
+  logger.log(
+    `Application is running on port ${port} in ${nodeEnv} mode`,
+    'Bootstrap',
+  );
+  logger.log(`CORS enabled for origins: ${corsOrigins}`, 'Bootstrap');
   logger.log(
     `Security headers enabled: ${configService.get('SECURITY_HELMET_ENABLED', 'true')}`,
+    'Bootstrap',
   );
 }
 
 bootstrap().catch(err => {
-  logger.error('Error during application bootstrap:', err);
+  // Fallback to console.error if logger not initialized
+  logger.error('Error during application bootstrap:', err, 'Bootstrap');
   process.exit(1);
 });

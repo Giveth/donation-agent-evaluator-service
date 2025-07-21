@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { LoggerModule } from '../../core/logger/logger.module';
 import { SocialMediaStorageModule } from '../social-media-storage/social-media-storage.module';
 import { SocialMediaModule } from '../social-media/social-media.module';
 import { DataFetchingModule } from '../data-fetching/data-fetching.module';
@@ -14,6 +15,7 @@ import { AdminController } from './controllers/admin.controller';
 @Module({
   imports: [
     TypeOrmModule.forFeature([ScheduledJob]),
+    LoggerModule,
     SocialMediaStorageModule,
     SocialMediaModule,
     DataFetchingModule,

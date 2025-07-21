@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { Logger } from 'nestjs-pino';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, QueryRunner } from 'typeorm';
 import { ProjectSocialAccount } from '../entities/project-social-account.entity';
@@ -33,9 +34,8 @@ export interface ProjectAccountData {
 
 @Injectable()
 export class ProjectSocialAccountService {
-  private readonly logger = new Logger(ProjectSocialAccountService.name);
-
   constructor(
+    private readonly logger: Logger,
     @InjectRepository(ProjectSocialAccount)
     private readonly projectAccountRepository: Repository<ProjectSocialAccount>,
   ) {}

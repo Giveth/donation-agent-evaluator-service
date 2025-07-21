@@ -1,5 +1,4 @@
-import { Injectable } from '@nestjs/common';
-import { Logger } from 'nestjs-pino';
+import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, QueryRunner } from 'typeorm';
@@ -48,8 +47,9 @@ const LOCK_TIMEOUT_MS = 6 * 60 * 60 * 1000; // 6 hours max
  */
 @Injectable()
 export class ProjectSyncProcessor {
+  private readonly logger = new Logger(ProjectSyncProcessor.name);
+
   constructor(
-    private readonly logger: Logger,
     private readonly impactGraphService: ImpactGraphService,
     private readonly projectSocialAccountService: ProjectSocialAccountService,
     @InjectDataSource() private readonly dataSource: DataSource,

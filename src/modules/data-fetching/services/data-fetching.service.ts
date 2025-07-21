@@ -1,5 +1,4 @@
-import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
-import { Logger } from 'nestjs-pino';
+import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import {
   ProjectDetailsDto,
   ProjectSocialMediaDto,
@@ -15,8 +14,9 @@ import { ProjectSocialAccount } from '../../social-media-storage/entities/projec
  */
 @Injectable()
 export class DataFetchingService {
+  private readonly logger = new Logger(DataFetchingService.name);
+
   constructor(
-    private readonly logger: Logger,
     private readonly projectSocialAccountService: ProjectSocialAccountService,
     private readonly impactGraphService: ImpactGraphService,
   ) {}

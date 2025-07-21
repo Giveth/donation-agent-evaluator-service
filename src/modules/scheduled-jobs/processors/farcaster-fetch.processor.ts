@@ -1,5 +1,4 @@
-import { Injectable } from '@nestjs/common';
-import { Logger } from 'nestjs-pino';
+import { Injectable, Logger } from '@nestjs/common';
 import { FarcasterService } from '../../social-media/services/farcaster.service';
 import { SocialPostStorageService } from '../../social-media-storage/services/social-post-storage.service';
 import { ProjectSocialAccountService } from '../../social-media-storage/services/project-social-account.service';
@@ -24,8 +23,9 @@ import { ScheduledJob } from '../../social-media-storage/entities/scheduled-job.
  */
 @Injectable()
 export class FarcasterFetchProcessor {
+  private readonly logger = new Logger(FarcasterFetchProcessor.name);
+
   constructor(
-    private readonly logger: Logger,
     private readonly farcasterService: FarcasterService,
     private readonly socialPostStorageService: SocialPostStorageService,
     private readonly projectSocialAccountService: ProjectSocialAccountService,

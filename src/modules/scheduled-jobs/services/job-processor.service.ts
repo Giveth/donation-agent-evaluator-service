@@ -1,5 +1,4 @@
-import { Injectable } from '@nestjs/common';
-import { Logger } from 'nestjs-pino';
+import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -41,6 +40,8 @@ import { ProjectSyncProcessor } from '../processors/project-sync.processor';
  */
 @Injectable()
 export class JobProcessorService {
+  private readonly logger = new Logger(JobProcessorService.name);
+
   // Configuration constants
   private readonly batchSize: number;
   private readonly twitterMinDelay: number;
@@ -50,7 +51,6 @@ export class JobProcessorService {
   private readonly maxRetries: number;
 
   constructor(
-    private readonly logger: Logger,
     @InjectRepository(ScheduledJob)
     private readonly scheduledJobRepository: Repository<ScheduledJob>,
     private readonly twitterService: TwitterService,

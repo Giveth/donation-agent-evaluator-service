@@ -1,5 +1,4 @@
-import { Injectable } from '@nestjs/common';
-import { Logger } from 'nestjs-pino';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   ScoringInputDto,
@@ -16,6 +15,7 @@ import {
 
 @Injectable()
 export class ScoringService {
+  private readonly logger = new Logger(ScoringService.name);
   private readonly weights: ScoringWeightsDto;
 
   // Configurable decay rates and thresholds
@@ -25,7 +25,6 @@ export class ScoringService {
   private readonly minPostsForFullFrequencyScore: number;
 
   constructor(
-    private readonly logger: Logger,
     private readonly configService: ConfigService,
     private readonly llmService: LLMService,
   ) {

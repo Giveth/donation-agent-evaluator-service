@@ -1,4 +1,5 @@
-import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { Logger } from 'nestjs-pino';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { GraphQLClient, ClientError } from 'graphql-request';
@@ -40,11 +41,11 @@ type GraphQLError = unknown;
  */
 @Injectable()
 export class ImpactGraphService {
-  private readonly logger = new Logger(ImpactGraphService.name);
   private readonly graphqlClient: GraphQLClient;
   private readonly baseUrl: string;
 
   constructor(
+    private readonly logger: Logger,
     private readonly configService: ConfigService,
     private readonly httpService: HttpService,
   ) {

@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { Logger } from 'nestjs-pino';
 import { ConfigService } from '@nestjs/config';
 import { Scraper, Tweet } from '@the-convocation/twitter-scraper';
 import { SocialPostDto, SocialMediaPlatform } from '../dto/social-post.dto';
@@ -51,7 +52,6 @@ export interface HandleResult {
  */
 @Injectable()
 export class TwitterService {
-  private readonly logger = new Logger(TwitterService.name);
   private readonly scraper: Scraper;
   private readonly cookiesFilePath: string;
   private isAuthenticated = false;
@@ -64,7 +64,10 @@ export class TwitterService {
   private readonly baseRetryDelay: number;
   private lastRequestTime: number = 0;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly logger: Logger,
+    private readonly configService: ConfigService,
+  ) {
     // Initialize the scraper
     this.scraper = new Scraper();
 

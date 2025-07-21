@@ -2,10 +2,10 @@ import {
   Controller,
   Post,
   Body,
-  Logger,
   ValidationPipe,
   UsePipes,
 } from '@nestjs/common';
+import { Logger } from 'nestjs-pino';
 import { EvaluationService } from './evaluation.service';
 import { EvaluateProjectsRequestDto } from './dto/evaluate-projects-request.dto';
 import { EvaluationResultDto } from './dto/evaluation-result.dto';
@@ -14,9 +14,10 @@ import { MultiCauseEvaluationResultDto } from './dto/multi-cause-evaluation-resu
 
 @Controller('evaluate')
 export class EvaluationController {
-  private readonly logger = new Logger(EvaluationController.name);
-
-  constructor(private readonly evaluationService: EvaluationService) {}
+  constructor(
+    private readonly logger: Logger,
+    private readonly evaluationService: EvaluationService,
+  ) {}
 
   /**
    * Evaluates projects within a cause and returns sorted scores.

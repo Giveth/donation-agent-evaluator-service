@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { Logger } from 'nestjs-pino';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
@@ -11,9 +12,8 @@ import {
 
 @Injectable()
 export class SocialPostStorageService {
-  private readonly logger = new Logger(SocialPostStorageService.name);
-
   constructor(
+    private readonly logger: Logger,
     @InjectRepository(StoredSocialPost)
     private readonly storedSocialPostRepository: Repository<StoredSocialPost>,
     @InjectRepository(ProjectSocialAccount)

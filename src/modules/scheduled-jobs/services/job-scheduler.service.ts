@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { Logger } from 'nestjs-pino';
 import { Cron } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -16,9 +17,8 @@ import { ProjectSocialAccountService } from '../../social-media-storage/services
  */
 @Injectable()
 export class JobSchedulerService {
-  private readonly logger = new Logger(JobSchedulerService.name);
-
   constructor(
+    private readonly logger: Logger,
     @InjectRepository(ScheduledJob)
     private readonly scheduledJobRepository: Repository<ScheduledJob>,
     private readonly projectSocialAccountService: ProjectSocialAccountService,

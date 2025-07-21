@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { Logger } from 'nestjs-pino';
 import pLimit from 'p-limit';
 import { DataFetchingService } from '../data-fetching/services/data-fetching.service';
 import { ImpactGraphService } from '../data-fetching/services/impact-graph.service';
@@ -26,10 +27,10 @@ import {
 
 @Injectable()
 export class EvaluationService {
-  private readonly logger = new Logger(EvaluationService.name);
   private readonly concurrencyLimit = pLimit(5); // Limit to 5 concurrent cause evaluations
 
   constructor(
+    private readonly logger: Logger,
     private readonly dataFetchingService: DataFetchingService,
     private readonly impactGraphService: ImpactGraphService,
     private readonly socialPostStorageService: SocialPostStorageService,
@@ -49,9 +50,12 @@ export class EvaluationService {
     projectIds: number[],
   ): Promise<ScoredProjectDto[]> {
     const startTime = Date.now();
-    this.logger.log(
-      `Starting evaluation for cause ${cause.id} with ${projectIds.length} projects`,
-    );
+    this.logger.log('Starting evaluation for cause', {
+      context: 'EvaluationService',
+      causeId: cause.id,
+      causeTitle: cause.title,
+      projectCount: projectIds.length,
+    });
 
     const scoredProjects: ScoredProjectDto[] = [];
 
@@ -65,7 +69,12 @@ export class EvaluationService {
           const scoredProject = await this.evaluateProject(project, cause);
           scoredProjects.push(scoredProject);
         } catch (error) {
-          this.logger.error(`Failed to evaluate project ${project.id}:`, error);
+          this.logger.error('Failed to evaluate project', {
+            context: 'EvaluationService',
+            projectId: project.id,
+            projectTitle: project.title,
+            error: error.message,
+          });
           // Continue with other projects, add zero-score entry
           scoredProjects.push({
             projectId: project.id.toString(),

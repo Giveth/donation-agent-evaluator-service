@@ -15,9 +15,7 @@ import {
 const logger = new Logger('Bootstrap');
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
-    logger: ['error', 'warn', 'log', 'verbose', 'debug'],
-  });
+  const app = await NestFactory.create(AppModule);
 
   // Get ConfigService for environment variables
   const configService = app.get(ConfigService);

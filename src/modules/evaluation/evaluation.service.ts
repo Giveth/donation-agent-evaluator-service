@@ -3,6 +3,7 @@ import pLimit from 'p-limit';
 import { DataFetchingService } from '../data-fetching/services/data-fetching.service';
 import { ImpactGraphService } from '../data-fetching/services/impact-graph.service';
 import { SocialPostStorageService } from '../social-media-storage/services/social-post-storage.service';
+import { CsvLoggerService } from './services/csv-logger.service';
 import { SocialMediaPlatform } from '../social-media/dto/social-post.dto';
 import { ProjectDetailsDto } from '../data-fetching/dto/project-details.dto';
 import {
@@ -34,6 +35,7 @@ export class EvaluationService {
     private readonly impactGraphService: ImpactGraphService,
     private readonly socialPostStorageService: SocialPostStorageService,
     private readonly scoringService: ScoringService,
+    private readonly csvLoggerService: CsvLoggerService,
   ) {}
 
   /**
@@ -212,6 +214,15 @@ export class EvaluationService {
 
     // Send evaluation results to Impact Graph (non-blocking)
     this.sendEvaluationToImpactGraph(request.cause.id, scoredProjects);
+
+    // Log evaluation results to CSV (non-blocking)
+    this.csvLoggerService
+      .logEvaluationResult(request.cause, result)
+      .catch(error => {
+        this.logger.warn(
+          `Failed to log CSV for cause ${request.cause.id}: ${error.message}`,
+        );
+      });
 
     return result;
   }

@@ -271,7 +271,6 @@ export class DataFetchingService {
       creationDate: undefined,
       updatedAt: undefined,
       latestUpdateCreationDate: project.lastUpdateDate,
-      adminUser: undefined,
       projectPower: project.givPowerRank
         ? {
             projectId: parseInt(project.projectId, 10),

@@ -242,8 +242,6 @@ export class ProjectSyncProcessor {
           categories: project.categories?.map(cat => cat.name) ?? [],
           mainCategory: project.mainCategory,
           subCategories: project.subCategories ?? [],
-          giveBacks: project.giveBacks,
-          isGivbackEligible: project.isGivbackEligible,
           creationDate: project.creationDate,
           updatedAt: project.updatedAt,
           latestUpdateCreationDate: project.latestUpdateCreationDate,

@@ -402,7 +402,7 @@ export class ProjectSyncProcessor {
 
       // Fetch causes with projects in batches using filters
       let offset = filterOptions.offset ?? 0;
-      const fetchBatchSize = filterOptions.limit ?? 50;
+      const fetchBatchSize = filterOptions.limit ?? 5;
       let hasMore = true;
 
       while (hasMore) {
@@ -448,13 +448,9 @@ export class ProjectSyncProcessor {
           }
         }
 
-        // Move to next batch (only if we're not using a specific limit)
-        if (!filterOptions.limit) {
-          offset += fetchBatchSize;
-          hasMore = causes.length === fetchBatchSize;
-        } else {
-          hasMore = false;
-        }
+        // Move to next batch - continue pagination until no more data
+        offset += fetchBatchSize;
+        hasMore = causes.length === fetchBatchSize;
       }
 
       this.logger.log(

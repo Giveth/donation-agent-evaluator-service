@@ -379,7 +379,7 @@ export class ImpactGraphService {
    * @returns Array of causes with complete project data for evaluation
    */
   async getCausesWithProjectsForEvaluation(
-    limit: number = 50,
+    limit: number = 5,
     offset: number = 0,
     searchTerm?: string,
     chainId?: number,
@@ -483,7 +483,7 @@ export class ImpactGraphService {
       // Start with first batch
       const allSlugs = new Set<string>();
       let offset = 0;
-      const limit = 50; // Reasonable batch size
+      const limit = 5; // Reasonable batch size
       let hasMore = true;
 
       while (hasMore) {

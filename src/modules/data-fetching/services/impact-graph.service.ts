@@ -54,13 +54,21 @@ export class ImpactGraphService {
       'https://impact-graph.serve.giveth.io/graphql',
     );
 
-    // Initialize GraphQL client
+    // Initialize GraphQL client with timeout configuration
     this.graphqlClient = new GraphQLClient(this.baseUrl, {
       headers: {
         'Content-Type': 'application/json',
         'User-Agent': 'Donation-Evaluator-Service/1.0',
       },
+      fetch: (url: RequestInfo | URL, init?: RequestInit) => {
+        return fetch(url, {
+          ...init,
+          signal: AbortSignal.timeout(150000), // 150 seconds timeout
+        });
+      },
     });
+
+    this.logger.log(`Initialized GraphQL client with 150 second timeout`);
 
     this.logger.log(
       `Initialized ImpactGraphService with endpoint: ${this.baseUrl}`,
@@ -379,7 +387,7 @@ export class ImpactGraphService {
    * @returns Array of causes with complete project data for evaluation
    */
   async getCausesWithProjectsForEvaluation(
-    limit: number = 5,
+    limit: number = 2,
     offset: number = 0,
     searchTerm?: string,
     chainId?: number,
@@ -390,6 +398,7 @@ export class ImpactGraphService {
     causes: Array<{ cause: CauseDetailsDto; projects: ProjectDetailsDto[] }>;
     totalProcessed: number;
   }> {
+    const startTime = Date.now();
     try {
       this.logger.debug(
         `Fetching causes with projects for evaluation (limit: ${limit}, offset: ${offset})`,
@@ -417,6 +426,13 @@ export class ImpactGraphService {
       const response = await this.graphqlClient.request<{
         causes: GraphQLCauseData[] | null;
       }>(ALL_PROJECTS_WITH_FILTERS_QUERY, variables);
+
+      const responseTime = Date.now() - startTime;
+      this.logger.debug(`GraphQL request completed in ${responseTime}ms`, {
+        responseTime,
+        limit,
+        offset,
+      });
 
       if (!response.causes || response.causes.length === 0) {
         this.logger.warn('No causes found in filtered GraphQL response');
@@ -451,8 +467,13 @@ export class ImpactGraphService {
         return { cause, projects };
       });
 
+      const totalResponseTime = Date.now() - startTime;
       this.logger.log(
-        `Successfully fetched ${processedCauses.length} filtered causes with ${processedCauses.reduce((sum, c) => sum + c.projects.length, 0)} total projects`,
+        `Successfully fetched ${processedCauses.length} filtered causes with ${processedCauses.reduce((sum, c) => sum + c.projects.length, 0)} total projects in ${totalResponseTime}ms`,
+        {
+          totalResponseTime,
+          causesCount: processedCauses.length,
+        },
       );
 
       return {
@@ -460,6 +481,15 @@ export class ImpactGraphService {
         totalProcessed: processedCauses.length,
       };
     } catch (error) {
+      const responseTime = Date.now() - startTime;
+      this.logger.error(`GraphQL request failed after ${responseTime}ms`, {
+        responseTime,
+        limit,
+        offset,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+
       this.handleGraphQLError(
         error as GraphQLError,
         'getCausesWithProjectsForEvaluation',
@@ -659,16 +689,18 @@ export class ImpactGraphService {
    */
   private handleGraphQLError(error: GraphQLError, operation: string): void {
     if (error instanceof ClientError) {
-      // GraphQL-specific error handling
+      // GraphQL-specific error handling with enhanced logging
       this.logger.error(`GraphQL error in ${operation}:`, {
         message: error.message,
         query: error.request.query,
         variables: error.request.variables,
         errors: error.response.errors,
         status: error.response.status,
+        data: error.response.data,
+        extensions: error.response.extensions,
       });
 
-      // Log individual GraphQL errors
+      // Log individual GraphQL errors with more detail
       if (error.response.errors) {
         error.response.errors.forEach(
           (gqlError: BaseGraphQLError, index: number) => {
@@ -680,8 +712,13 @@ export class ImpactGraphService {
                 column: loc.column,
               })),
               extensions: gqlError.extensions,
+              source: gqlError.source?.body,
             });
           },
+        );
+      } else {
+        this.logger.error(
+          `No specific GraphQL errors found in response for ${operation}`,
         );
       }
     } else if (
@@ -693,19 +730,31 @@ export class ImpactGraphService {
         message: (error as { message: string }).message,
         code: (error as { code: string }).code,
         hostname: (error as { hostname?: string }).hostname,
+        errno: (error as { errno?: string }).errno,
+        syscall: (error as { syscall?: string }).syscall,
       });
     } else if ((error as { code?: string }).code === 'ETIMEDOUT') {
       // Timeout issues
       this.logger.error(`Timeout error in ${operation}:`, {
         message: (error as { message: string }).message,
         timeout: (error as { timeout?: number }).timeout,
+        code: (error as { code: string }).code,
+      });
+    } else if ((error as { name?: string }).name === 'AbortError') {
+      // Request was aborted (likely timeout)
+      this.logger.error(`Request aborted in ${operation}:`, {
+        message: (error as { message: string }).message,
+        name: (error as { name: string }).name,
+        cause: (error as { cause?: unknown }).cause,
       });
     } else {
-      // Generic error handling
+      // Generic error handling with more context
       this.logger.error(`Unexpected error in ${operation}:`, {
         message: (error as { message: string }).message,
         stack: (error as { stack?: string }).stack,
         name: (error as { name?: string }).name,
+        cause: (error as { cause?: unknown }).cause,
+        code: (error as { code?: string }).code,
       });
     }
   }

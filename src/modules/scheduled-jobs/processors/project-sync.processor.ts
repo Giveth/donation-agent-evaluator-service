@@ -402,7 +402,7 @@ export class ProjectSyncProcessor {
 
       // Fetch causes with projects in batches using filters
       let offset = filterOptions.offset ?? 0;
-      const fetchBatchSize = filterOptions.limit ?? 5;
+      const fetchBatchSize = filterOptions.limit ?? 2;
       let hasMore = true;
 
       while (hasMore) {

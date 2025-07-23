@@ -1,12 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as csvWriter from 'csv-writer';
+import { parse } from 'csv-parse/sync';
 import * as fs from 'fs';
 import * as path from 'path';
 import { EvaluationResultDto } from '../dto/evaluation-result.dto';
 import { CauseDto } from '../dto/evaluate-projects-request.dto';
 
-interface CsvRowData {
+export interface CsvRowData {
   causeId: number;
   causeTitle: string;
   projectId: string;
@@ -19,9 +20,6 @@ interface CsvRowData {
   relevanceToCauseScore: number;
   evidenceOfImpactScore: number;
   givPowerRankScore: number;
-  hasStoredPosts: boolean;
-  totalStoredPosts: number;
-  lastPostDate: string;
   evaluationTimestamp: string;
 }
 
@@ -35,6 +33,16 @@ export class CsvLoggerService {
       'CSV_EVALUATION_LOG_PATH',
       './evaluation-results.csv',
     );
+  }
+
+  readEvaluationResults(causeIds?: number[]): CsvRowData[] {
+    const allData = this.readExistingCsvData();
+
+    if (!causeIds || causeIds.length === 0) {
+      return allData;
+    }
+
+    return allData.filter(row => causeIds.includes(row.causeId));
   }
 
   async logEvaluationResult(
@@ -73,18 +81,13 @@ export class CsvLoggerService {
         return [];
       }
 
-      const lines = csvContent.trim().split('\n');
-      if (lines.length <= 1) {
-        return [];
-      }
-
-      const headers = lines[0].split(',');
-      const rows = lines.slice(1);
-
-      return rows.map(row => {
-        const values = this.parseCsvRow(row);
-        return this.mapRowToData(headers, values);
+      const records: Array<Record<string, string>> = parse(csvContent, {
+        columns: true,
+        skip_empty_lines: true,
+        trim: true,
       });
+
+      return records.map(record => this.mapRecordToData(record));
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -95,86 +98,28 @@ export class CsvLoggerService {
     }
   }
 
-  private parseCsvRow(row: string): string[] {
-    const result: string[] = [];
-    let current = '';
-    let inQuotes = false;
-
-    for (let i = 0; i < row.length; i++) {
-      const char = row[i];
-
-      if (char === '"') {
-        inQuotes = !inQuotes;
-      } else if (char === ',' && !inQuotes) {
-        result.push(current.trim());
-        current = '';
-      } else {
-        current += char;
-      }
-    }
-
-    result.push(current.trim());
-    return result;
-  }
-
-  private mapRowToData(headers: string[], values: string[]): CsvRowData {
-    const data: Partial<CsvRowData> = {};
-    headers.forEach((header, index) => {
-      const cleanHeader = header.replace(/"/g, '').trim();
-      const value = values[index]?.replace(/"/g, '').trim() ?? '';
-
-      switch (cleanHeader) {
-        case 'causeId':
-          (data as any).causeId = parseInt(value) || 0;
-          break;
-        case 'causeScore':
-          (data as any).causeScore = parseInt(value) || 0;
-          break;
-        case 'projectInfoQualityScore':
-          (data as any).projectInfoQualityScore = parseInt(value) || 0;
-          break;
-        case 'updateRecencyScore':
-          (data as any).updateRecencyScore = parseInt(value) || 0;
-          break;
-        case 'socialMediaQualityScore':
-          (data as any).socialMediaQualityScore = parseInt(value) || 0;
-          break;
-        case 'socialMediaRecencyScore':
-          (data as any).socialMediaRecencyScore = parseInt(value) || 0;
-          break;
-        case 'socialMediaFrequencyScore':
-          (data as any).socialMediaFrequencyScore = parseInt(value) || 0;
-          break;
-        case 'relevanceToCauseScore':
-          (data as any).relevanceToCauseScore = parseInt(value) || 0;
-          break;
-        case 'evidenceOfImpactScore':
-          (data as any).evidenceOfImpactScore = parseInt(value) || 0;
-          break;
-        case 'givPowerRankScore':
-          (data as any).givPowerRankScore = parseInt(value) || 0;
-          break;
-        case 'totalStoredPosts':
-          (data as any).totalStoredPosts = parseInt(value) || 0;
-          break;
-        case 'hasStoredPosts':
-          (data as any).hasStoredPosts = value.toLowerCase() === 'true';
-          break;
-        case 'causeTitle':
-          (data as any).causeTitle = value;
-          break;
-        case 'projectId':
-          (data as any).projectId = value;
-          break;
-        case 'lastPostDate':
-          (data as any).lastPostDate = value;
-          break;
-        case 'evaluationTimestamp':
-          (data as any).evaluationTimestamp = value;
-          break;
-      }
-    });
-    return data as CsvRowData;
+  private mapRecordToData(record: Record<string, string>): CsvRowData {
+    return {
+      causeId: parseInt(record.causeId || '0') || 0,
+      causeTitle: record.causeTitle || '',
+      projectId: record.projectId || '',
+      causeScore: parseFloat(record.causeScore || '0') || 0,
+      projectInfoQualityScore:
+        parseFloat(record.projectInfoQualityScore || '0') || 0,
+      updateRecencyScore: parseFloat(record.updateRecencyScore || '0') || 0,
+      socialMediaQualityScore:
+        parseFloat(record.socialMediaQualityScore || '0') || 0,
+      socialMediaRecencyScore:
+        parseFloat(record.socialMediaRecencyScore || '0') || 0,
+      socialMediaFrequencyScore:
+        parseFloat(record.socialMediaFrequencyScore || '0') || 0,
+      relevanceToCauseScore:
+        parseFloat(record.relevanceToCauseScore || '0') || 0,
+      evidenceOfImpactScore:
+        parseFloat(record.evidenceOfImpactScore || '0') || 0,
+      givPowerRankScore: parseFloat(record.givPowerRankScore || '0') || 0,
+      evaluationTimestamp: record.evaluationTimestamp || '',
+    };
   }
 
   private removeExistingCauseData(
@@ -205,11 +150,6 @@ export class CsvLoggerService {
       relevanceToCauseScore: project.scoreBreakdown?.relevanceToCauseScore ?? 0,
       evidenceOfImpactScore: project.scoreBreakdown?.evidenceOfImpactScore ?? 0,
       givPowerRankScore: project.scoreBreakdown?.givPowerRankScore ?? 0,
-      hasStoredPosts: project.hasStoredPosts ?? false,
-      totalStoredPosts: project.totalStoredPosts ?? 0,
-      lastPostDate: project.lastPostDate
-        ? project.lastPostDate.toISOString()
-        : '',
       evaluationTimestamp: project.evaluationTimestamp.toISOString(),
     }));
   }
@@ -237,9 +177,6 @@ export class CsvLoggerService {
         { id: 'relevanceToCauseScore', title: 'relevanceToCauseScore' },
         { id: 'evidenceOfImpactScore', title: 'evidenceOfImpactScore' },
         { id: 'givPowerRankScore', title: 'givPowerRankScore' },
-        { id: 'hasStoredPosts', title: 'hasStoredPosts' },
-        { id: 'totalStoredPosts', title: 'totalStoredPosts' },
-        { id: 'lastPostDate', title: 'lastPostDate' },
         { id: 'evaluationTimestamp', title: 'evaluationTimestamp' },
       ],
     });

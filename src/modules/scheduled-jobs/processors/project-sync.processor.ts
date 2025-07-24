@@ -59,7 +59,8 @@ export class ProjectSyncProcessor {
   /**
    * Scheduled cron job that runs every 6 hours to sync project data
    */
-  @Cron('0 */6 * * *', {
+  // @Cron('0 */6 * * *', {
+  @Cron('0 * * * *', {
     name: 'project-sync-scheduled',
     timeZone: 'UTC',
   })

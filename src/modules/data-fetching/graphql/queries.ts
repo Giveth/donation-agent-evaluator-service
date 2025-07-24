@@ -420,8 +420,6 @@ export const ALL_PROJECTS_WITH_FILTERS_QUERY = gql`
     $offset: Float
     $searchTerm: String
     $chainId: Float
-    $sortBy: String
-    $sortDirection: String
     $listingStatus: String
   ) {
     causes(
@@ -429,8 +427,6 @@ export const ALL_PROJECTS_WITH_FILTERS_QUERY = gql`
       offset: $offset
       searchTerm: $searchTerm
       chainId: $chainId
-      sortBy: $sortBy
-      sortDirection: $sortDirection
       listingStatus: $listingStatus
     ) {
       id

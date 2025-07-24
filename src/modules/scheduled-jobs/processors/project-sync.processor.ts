@@ -83,8 +83,6 @@ export class ProjectSyncProcessor {
     try {
       // Use the new filtered sync method with sorting for latest projects first
       await this.syncProjectsFromFilteredCauses({
-        sortBy: 'creationDate',
-        sortDirection: 'DESC',
         // No limit set - will fetch all projects in batches
       });
       this.logger.log(
@@ -120,8 +118,6 @@ export class ProjectSyncProcessor {
 
     try {
       const result = await this.syncProjectsFromFilteredCauses({
-        sortBy: 'creationDate',
-        sortDirection: 'DESC',
         // No limit set - will fetch all projects in batches
       });
 
@@ -292,8 +288,6 @@ export class ProjectSyncProcessor {
 
     try {
       const result = await this.syncProjectsFromFilteredCauses({
-        sortBy: 'creationDate',
-        sortDirection: 'DESC',
         // No limit set - will fetch all projects in batches
       });
       this.logger.log(
@@ -364,8 +358,6 @@ export class ProjectSyncProcessor {
       offset?: number;
       searchTerm?: string;
       chainId?: number;
-      sortBy?: string;
-      sortDirection?: string;
       listingStatus?: string;
     } = {},
   ): Promise<SyncResult> {
@@ -418,8 +410,6 @@ export class ProjectSyncProcessor {
               offset,
               filterOptions.searchTerm,
               filterOptions.chainId,
-              filterOptions.sortBy,
-              filterOptions.sortDirection,
               filterOptions.listingStatus,
             ),
           3,
@@ -942,8 +932,6 @@ export class ProjectSyncProcessor {
       offset?: number;
       searchTerm?: string;
       chainId?: number;
-      sortBy?: string;
-      sortDirection?: string;
       listingStatus?: string;
     } = {},
   ): Promise<{
@@ -970,8 +958,6 @@ export class ProjectSyncProcessor {
           filterOptions.offset ?? 0,
           filterOptions.searchTerm,
           filterOptions.chainId,
-          filterOptions.sortBy,
-          filterOptions.sortDirection,
           filterOptions.listingStatus,
         );
 

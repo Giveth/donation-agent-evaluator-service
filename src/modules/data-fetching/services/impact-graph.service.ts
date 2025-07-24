@@ -381,8 +381,6 @@ export class ImpactGraphService {
    * @param offset - Number of causes to skip (default: 0)
    * @param searchTerm - Optional search term to filter causes
    * @param chainId - Optional chain ID to filter causes
-   * @param sortBy - Optional field to sort by
-   * @param sortDirection - Optional sort direction (ASC/DESC)
    * @param listingStatus - Optional listing status filter
    * @returns Array of causes with complete project data for evaluation
    */
@@ -391,8 +389,6 @@ export class ImpactGraphService {
     offset: number = 0,
     searchTerm?: string,
     chainId?: number,
-    sortBy?: string,
-    sortDirection?: string,
     listingStatus?: string,
   ): Promise<{
     causes: Array<{ cause: CauseDetailsDto; projects: ProjectDetailsDto[] }>;
@@ -407,8 +403,6 @@ export class ImpactGraphService {
           offset,
           searchTerm,
           chainId,
-          sortBy,
-          sortDirection,
           listingStatus,
         },
       );
@@ -418,8 +412,6 @@ export class ImpactGraphService {
         offset,
         searchTerm,
         chainId,
-        sortBy,
-        sortDirection,
         listingStatus,
       };
 

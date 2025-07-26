@@ -3,9 +3,12 @@ import {
   Post,
   Get,
   Param,
+  Query,
   HttpStatus,
   HttpException,
   Logger,
+  ValidationPipe,
+  UsePipes,
 } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
 import { JobSchedulerService } from '../services/job-scheduler.service';
@@ -21,6 +24,8 @@ import {
   ScheduledJob,
 } from '../../social-media-storage/entities/scheduled-job.entity';
 import { SocialMediaPlatform } from '../../social-media/dto/social-post.dto';
+import { GetSocialPostsQueryDto } from '../dto/get-social-posts-query.dto';
+import { SocialPostsResponseDto } from '../dto/social-posts-response.dto';
 
 /**
  * Admin Controller for Manual Operations
@@ -581,6 +586,126 @@ export class AdminController {
         {
           success: false,
           message: 'Failed to validate cause-project filtering',
+          error: error.message,
+          correlationId,
+          timestamp: new Date().toISOString(),
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * GET /admin/social-posts
+   *
+   * Retrieve stored social media posts for multiple projects.
+   * Returns posts grouped by project with project information and social handles.
+   *
+   * @param query - Query parameters with project IDs, platform filter, and limit
+   * @returns Promise<SocialPostsResponseDto> - Posts grouped by project
+   */
+  @Get('social-posts')
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+  async getSocialPosts(
+    @Query() query: GetSocialPostsQueryDto,
+  ): Promise<SocialPostsResponseDto> {
+    const correlationId = uuidv4();
+    const startTime = Date.now();
+
+    const projectIds = query.getParsedProjectIds();
+    this.logger.log(
+      `Social posts retrieval requested for ${projectIds.length} projects via admin endpoint`,
+      {
+        correlationId,
+        projectIds,
+        platform: query.platform,
+        limit: query.limit,
+        endpoint: 'GET /admin/social-posts',
+      },
+    );
+
+    try {
+      // Validate project IDs
+      if (projectIds.length === 0) {
+        throw new HttpException(
+          {
+            success: false,
+            message: 'At least one project ID is required',
+            correlationId,
+            timestamp: new Date().toISOString(),
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      if (projectIds.length > 50) {
+        throw new HttpException(
+          {
+            success: false,
+            message: 'Cannot request more than 50 projects at once',
+            correlationId,
+            timestamp: new Date().toISOString(),
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Retrieve social posts for multiple projects
+      const result =
+        await this.socialPostStorageService.getSocialPostsForMultipleProjects(
+          projectIds,
+          query.platform,
+          query.limit ?? 10,
+        );
+
+      const responseTime = Date.now() - startTime;
+      this.logger.log(
+        `Social posts retrieval completed in ${responseTime}ms. ` +
+          `${result.projectsWithPosts}/${result.totalProjects} projects had posts.`,
+        {
+          correlationId,
+          result: {
+            totalProjects: result.totalProjects,
+            projectsWithPosts: result.projectsWithPosts,
+          },
+          responseTimeMs: responseTime,
+        },
+      );
+
+      return {
+        success: true,
+        data: {
+          totalProjects: result.totalProjects,
+          projectsWithPosts: result.projectsWithPosts,
+          projects: result.projects.map(project => ({
+            projectId: project.projectId,
+            projectInfo: project.projectInfo,
+            posts: project.posts,
+            postCounts: project.postCounts,
+          })),
+        },
+        correlationId,
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      const responseTime = Date.now() - startTime;
+
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error('Failed to retrieve social posts via admin endpoint', {
+        error: error.message,
+        stack: error.stack,
+        correlationId,
+        projectIds,
+        responseTimeMs: responseTime,
+      });
+
+      throw new HttpException(
+        {
+          success: false,
+          message: 'Failed to retrieve social posts',
           error: error.message,
           correlationId,
           timestamp: new Date().toISOString(),

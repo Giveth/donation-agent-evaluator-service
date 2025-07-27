@@ -4,13 +4,7 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './core/common/exceptions/global-exception.filter';
 import helmet from 'helmet';
-import {
-  json,
-  urlencoded,
-  type Request,
-  type Response,
-  type NextFunction,
-} from 'express';
+import { json, urlencoded } from 'express';
 
 const logger = new Logger('Bootstrap');
 
@@ -84,30 +78,11 @@ async function bootstrap() {
   }
 
   // Request Limits Configuration
-  const requestTimeout = parseInt(
-    configService.get('REQUEST_TIMEOUT', '30000'),
-    10,
-  );
   const bodyParserLimit = configService.get('BODY_PARSER_LIMIT', '10mb');
 
   // Configure body parser limits
   app.use(json({ limit: bodyParserLimit }));
   app.use(urlencoded({ extended: true, limit: bodyParserLimit }));
-
-  // Set request timeout
-  app.use((req: Request, res: Response, next: NextFunction) => {
-    req.setTimeout(requestTimeout, () => {
-      const err = new Error('Request timeout');
-      err.name = 'RequestTimeoutError';
-      next(err);
-    });
-    res.setTimeout(requestTimeout, () => {
-      const err = new Error('Response timeout');
-      err.name = 'ResponseTimeoutError';
-      next(err);
-    });
-    next();
-  });
 
   // ===========================================
   // GLOBAL CONFIGURATIONS

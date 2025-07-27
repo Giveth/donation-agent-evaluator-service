@@ -7,6 +7,7 @@ import {
   Logger,
   ValidationPipe,
   UsePipes,
+  UseInterceptors,
 } from '@nestjs/common';
 import { EvaluationService } from './evaluation.service';
 import { EvaluateProjectsRequestDto } from './dto/evaluate-projects-request.dto';
@@ -16,6 +17,7 @@ import { MultiCauseEvaluationResultDto } from './dto/multi-cause-evaluation-resu
 import { EvaluationDetailedQueryDto } from './dto/evaluation-detailed-query.dto';
 import { EvaluationDetailedResponseDto } from './dto/evaluation-detailed-response.dto';
 import { CsvLoggerService, CsvRowData } from './services/csv-logger.service';
+import { TimeoutInterceptor } from '../../core/common/interceptors/timeout.interceptor';
 
 @Controller('evaluate')
 export class EvaluationController {
@@ -34,6 +36,7 @@ export class EvaluationController {
    * @returns EvaluationResultDto - Sorted projects with scores and metadata
    */
   @Post('cause')
+  @UseInterceptors(new TimeoutInterceptor(120000)) // 2 minutes timeout
   @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
   async evaluateProjects(
     @Body() request: EvaluateProjectsRequestDto,
@@ -70,6 +73,7 @@ export class EvaluationController {
    * @returns MultiCauseEvaluationResultDto - Results grouped by cause with aggregated metadata
    */
   @Post('causes')
+  @UseInterceptors(new TimeoutInterceptor(300000)) // 5 minutes timeout for multiple causes
   @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
   async evaluateMultipleCauses(
     @Body() request: EvaluateMultipleCausesRequestDto,

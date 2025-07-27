@@ -31,7 +31,7 @@ export class CsvLoggerService {
   constructor(private readonly configService: ConfigService) {
     this.csvFilePath = this.configService.get<string>(
       'CSV_EVALUATION_LOG_PATH',
-      './evaluation-results.csv',
+      './data/evaluation-results.csv',
     );
   }
 

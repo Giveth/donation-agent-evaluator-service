@@ -7,21 +7,39 @@ export class EvaluationDetailedQueryDto {
   @IsInt({ each: true })
   @Type(() => Number)
   @Transform(({ value }): number[] | undefined => {
-    if (!value) return undefined;
+    console.log(
+      `DTO Transform: Input value: ${JSON.stringify(value)}, type: ${typeof value}, isArray: ${Array.isArray(value)}`,
+    );
+
+    if (!value) {
+      console.log('DTO Transform: No value provided, returning undefined');
+      return undefined;
+    }
 
     if (typeof value === 'string') {
-      return value
+      const result = value
         .split(',')
         .map(id => parseInt(id, 10))
         .filter(id => !isNaN(id));
+      console.log(
+        `DTO Transform: String input "${value}" transformed to: ${JSON.stringify(result)}`,
+      );
+      return result;
     }
 
     if (Array.isArray(value)) {
-      return value
+      const result = value
         .map(id => (typeof id === 'string' ? parseInt(id, 10) : id))
         .filter(id => !isNaN(id));
+      console.log(
+        `DTO Transform: Array input ${JSON.stringify(value)} transformed to: ${JSON.stringify(result)}`,
+      );
+      return result;
     }
 
+    console.log(
+      `DTO Transform: Unhandled value type, returning undefined for value: ${JSON.stringify(value)}`,
+    );
     return undefined;
   })
   causeIds?: number[];

@@ -38,11 +38,30 @@ export class CsvLoggerService {
   readEvaluationResults(causeIds?: number[]): CsvRowData[] {
     const allData = this.readExistingCsvData();
 
+    this.logger.log(
+      `CSV Logger: Reading evaluation results. Total records: ${allData.length}, Requested causeIds: ${JSON.stringify(causeIds)}`,
+    );
+
     if (!causeIds || causeIds.length === 0) {
+      this.logger.log(
+        'CSV Logger: No causeIds filter provided, returning all data',
+      );
       return allData;
     }
 
-    return allData.filter(row => causeIds.includes(row.causeId));
+    const filteredData = allData.filter(row => {
+      const matches = causeIds.includes(row.causeId);
+      this.logger.log(
+        `CSV Logger: Checking row causeId ${row.causeId} against filter ${JSON.stringify(causeIds)}: ${matches}`,
+      );
+      return matches;
+    });
+
+    this.logger.log(
+      `CSV Logger: Filtered data result: ${filteredData.length} records match causeIds ${causeIds.join(', ')}`,
+    );
+
+    return filteredData;
   }
 
   async logEvaluationResult(

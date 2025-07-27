@@ -36,7 +36,7 @@ export class EvaluationController {
    * @returns EvaluationResultDto - Sorted projects with scores and metadata
    */
   @Post('cause')
-  @UseInterceptors(new TimeoutInterceptor(120000)) // 2 minutes timeout
+  @UseInterceptors(new TimeoutInterceptor()) // Dynamic timeout based on project count
   @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
   async evaluateProjects(
     @Body() request: EvaluateProjectsRequestDto,
@@ -73,7 +73,7 @@ export class EvaluationController {
    * @returns MultiCauseEvaluationResultDto - Results grouped by cause with aggregated metadata
    */
   @Post('causes')
-  @UseInterceptors(new TimeoutInterceptor(300000)) // 5 minutes timeout for multiple causes
+  @UseInterceptors(new TimeoutInterceptor()) // Dynamic timeout based on total project count
   @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
   async evaluateMultipleCauses(
     @Body() request: EvaluateMultipleCausesRequestDto,

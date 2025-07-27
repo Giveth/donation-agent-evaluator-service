@@ -27,6 +27,14 @@ export class EvaluationDetailedQueryDto {
       return result;
     }
 
+    if (typeof value === 'number') {
+      const result = [value];
+      console.log(
+        `DTO Transform: Number input ${value} transformed to: ${JSON.stringify(result)}`,
+      );
+      return result;
+    }
+
     if (Array.isArray(value)) {
       const result = value
         .map(id => (typeof id === 'string' ? parseInt(id, 10) : id))

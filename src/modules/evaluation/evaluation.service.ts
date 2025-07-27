@@ -71,6 +71,7 @@ export class EvaluationService {
           // Continue with other projects, add zero-score entry
           scoredProjects.push({
             projectId: project.id.toString(),
+            projectTitle: project.title,
             causeScore: 0,
             hasStoredPosts: false,
             totalStoredPosts: 0,
@@ -166,6 +167,7 @@ export class EvaluationService {
 
     const result = {
       projectId: project.id.toString(),
+      projectTitle: project.title,
       causeScore: finalScore,
       scoreBreakdown: breakdown,
       hasStoredPosts,

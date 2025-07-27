@@ -11,6 +11,7 @@ export interface CsvRowData {
   causeId: number;
   causeTitle: string;
   projectId: string;
+  projectTitle: string;
   causeScore: number;
   projectInfoQualityScore: number;
   updateRecencyScore: number;
@@ -112,6 +113,7 @@ export class CsvLoggerService {
       causeId: parseInt(record.causeId || '0') || 0,
       causeTitle: record.causeTitle || '',
       projectId: record.projectId || '',
+      projectTitle: record.projectTitle || '',
       causeScore: parseFloat(record.causeScore || '0') || 0,
       projectInfoQualityScore:
         parseFloat(record.projectInfoQualityScore || '0') || 0,
@@ -146,6 +148,7 @@ export class CsvLoggerService {
       causeId: cause.id,
       causeTitle: cause.title,
       projectId: project.projectId,
+      projectTitle: project.projectTitle,
       causeScore: project.causeScore,
       projectInfoQualityScore:
         project.scoreBreakdown?.projectInfoQualityScore ?? 0,
@@ -177,6 +180,7 @@ export class CsvLoggerService {
         { id: 'causeId', title: 'causeId' },
         { id: 'causeTitle', title: 'causeTitle' },
         { id: 'projectId', title: 'projectId' },
+        { id: 'projectTitle', title: 'projectTitle' },
         { id: 'causeScore', title: 'causeScore' },
         { id: 'projectInfoQualityScore', title: 'projectInfoQualityScore' },
         { id: 'updateRecencyScore', title: 'updateRecencyScore' },

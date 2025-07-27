@@ -2,6 +2,7 @@ export class EvaluationDetailedProjectDto {
   causeId: number;
   causeTitle: string;
   projectId: string;
+  projectTitle: string;
   causeScore: number;
   projectInfoQualityScore: number;
   updateRecencyScore: number;

@@ -164,6 +164,7 @@ export class EvaluationController {
             causeId: project.causeId,
             causeTitle: project.causeTitle,
             projectId: project.projectId,
+            projectTitle: project.projectTitle,
             causeScore: project.causeScore,
             projectInfoQualityScore: project.projectInfoQualityScore,
             updateRecencyScore: project.updateRecencyScore,

@@ -29,6 +29,7 @@ import {
 export class EvaluationService {
   private readonly logger = new Logger(EvaluationService.name);
   private readonly concurrencyLimit = pLimit(5); // Limit to 5 concurrent cause evaluations
+  private readonly projectConcurrencyLimit = pLimit(3); // Limit to 3 concurrent project evaluations
 
   constructor(
     private readonly dataFetchingService: DataFetchingService,
@@ -62,23 +63,40 @@ export class EvaluationService {
       const projects =
         await this.dataFetchingService.getProjectsByIds(projectIds);
 
-      for (const project of projects) {
-        try {
-          const scoredProject = await this.evaluateProject(project, cause);
-          scoredProjects.push(scoredProject);
-        } catch (error) {
-          this.logger.error(`Failed to evaluate project ${project.id}:`, error);
-          // Continue with other projects, add zero-score entry
-          scoredProjects.push({
-            projectId: project.id.toString(),
-            projectTitle: project.title,
-            causeScore: 0,
-            hasStoredPosts: false,
-            totalStoredPosts: 0,
-            evaluationTimestamp: new Date(),
-          });
-        }
-      }
+      this.logger.debug(
+        `Processing ${projects.length} projects with concurrency limit of 3`,
+      );
+
+      // Process projects in parallel with controlled concurrency
+      const evaluationPromises = projects.map(project =>
+        this.projectConcurrencyLimit(async () => {
+          try {
+            const scoredProject = await this.evaluateProject(project, cause);
+            this.logger.debug(
+              `Successfully evaluated project ${project.id} with score ${scoredProject.causeScore}`,
+            );
+            return scoredProject;
+          } catch (error) {
+            this.logger.error(
+              `Failed to evaluate project ${project.id}:`,
+              error,
+            );
+            // Return zero-score entry for failed evaluations
+            return {
+              projectId: project.id.toString(),
+              projectTitle: project.title,
+              causeScore: 0,
+              hasStoredPosts: false,
+              totalStoredPosts: 0,
+              evaluationTimestamp: new Date(),
+            };
+          }
+        }),
+      );
+
+      // Wait for all project evaluations to complete
+      const evaluationResults = await Promise.all(evaluationPromises);
+      scoredProjects.push(...evaluationResults);
     } catch (error) {
       this.logger.error(
         `Failed to fetch projects for cause ${cause.id}:`,

@@ -108,12 +108,7 @@ export class EvaluationController {
     @Query() query: EvaluationDetailedQueryDto,
   ): EvaluationDetailedResponseDto {
     this.logger.log(
-      `Received detailed evaluation request for causes: ${query.causeIds?.join(', ') ?? 'all'} (raw: ${JSON.stringify(query)})`,
-    );
-
-    // Debug logging to track the transformation
-    this.logger.log(
-      `DEBUG: causeIds type: ${typeof query.causeIds}, value: ${JSON.stringify(query.causeIds)}, isArray: ${Array.isArray(query.causeIds)}`,
+      `Received detailed evaluation request for causes: ${query.causeIds?.join(', ') ?? 'all'}`,
     );
 
     try {

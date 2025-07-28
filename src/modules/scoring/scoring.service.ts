@@ -332,21 +332,36 @@ Respond in JSON format:
   /**
    * Calculate GIVpower rank score (0-100)
    * Lower rank = higher score
+   * Returns 0 when totalProjectCount is null (indicating getTopPowerRank query failed)
    */
   private calculateGivPowerRankScore(
     givPowerRank?: number,
-    totalProjectCount?: number,
+    totalProjectCount?: number | null,
   ): number {
+    // Return 0 if top power rank query failed (indicated by null totalProjectCount)
+    if (totalProjectCount === null) {
+      this.logger.debug(
+        'GIVpower scoring disabled - totalProjectCount is null (getTopPowerRank query failed)',
+      );
+      return 0;
+    }
+
+    // Return 0 if project has no GIVpower rank
     if (!givPowerRank) {
       return 0;
     }
 
-    // If we don't know total project count, use a reasonable default
-    const totalProjects = totalProjectCount ?? 1000;
+    // Return 0 if totalProjectCount is not available (shouldn't happen with new implementation)
+    if (!totalProjectCount) {
+      this.logger.warn(
+        'GIVpower scoring disabled - totalProjectCount is undefined',
+      );
+      return 0;
+    }
 
     // Normalize rank to percentile (lower rank is better)
     // Top 10% get 90-100 score, bottom 10% get 0-10 score
-    const percentile = (totalProjects - givPowerRank) / totalProjects;
+    const percentile = (totalProjectCount - givPowerRank) / totalProjectCount;
     const score = percentile * 100;
 
     return Math.round(Math.max(0, Math.min(100, score)));

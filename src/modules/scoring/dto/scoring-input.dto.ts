@@ -74,10 +74,11 @@ export class ScoringInputDto {
 
   /**
    * Total number of projects in the system (for rank normalization)
+   * When null, GIVpower scoring will be disabled (score = 0)
    */
   @IsOptional()
   @IsNumber()
-  totalProjectCount?: number;
+  totalProjectCount?: number | null;
 
   /**
    * Cause title for relevance assessment

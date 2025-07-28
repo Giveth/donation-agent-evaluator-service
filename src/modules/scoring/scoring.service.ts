@@ -335,36 +335,41 @@ Respond in JSON format:
    * Returns 0 when totalProjectCount is null (indicating getTopPowerRank query failed)
    */
   private calculateGivPowerRankScore(
-    givPowerRank?: number,
-    totalProjectCount?: number | null,
+    _givPowerRank?: number,
+    _totalProjectCount?: number | null,
   ): number {
-    // Return 0 if top power rank query failed (indicated by null totalProjectCount)
-    if (totalProjectCount === null) {
-      this.logger.debug(
-        'GIVpower scoring disabled - totalProjectCount is null (getTopPowerRank query failed)',
-      );
-      return 0;
-    }
+    // TODO: Re-enable GIVpower scoring when Impact Graph is fixed
+    // Currently returning 0 for all projects due to Impact Graph issues
+    return 0;
 
-    // Return 0 if project has no GIVpower rank
-    if (!givPowerRank) {
-      return 0;
-    }
+    // Original implementation commented out until Impact Graph is fixed:
+    // // Return 0 if top power rank query failed (indicated by null totalProjectCount)
+    // if (totalProjectCount === null) {
+    //   this.logger.debug(
+    //     'GIVpower scoring disabled - totalProjectCount is null (getTopPowerRank query failed)',
+    //   );
+    //   return 0;
+    // }
 
-    // Return 0 if totalProjectCount is not available (shouldn't happen with new implementation)
-    if (!totalProjectCount) {
-      this.logger.warn(
-        'GIVpower scoring disabled - totalProjectCount is undefined',
-      );
-      return 0;
-    }
+    // // Return 0 if project has no GIVpower rank
+    // if (!givPowerRank) {
+    //   return 0;
+    // }
 
-    // Normalize rank to percentile (lower rank is better)
-    // Top 10% get 90-100 score, bottom 10% get 0-10 score
-    const percentile = (totalProjectCount - givPowerRank) / totalProjectCount;
-    const score = percentile * 100;
+    // // Return 0 if totalProjectCount is not available (shouldn't happen with new implementation)
+    // if (!totalProjectCount) {
+    //   this.logger.warn(
+    //     'GIVpower scoring disabled - totalProjectCount is undefined',
+    //   );
+    //   return 0;
+    // }
 
-    return Math.round(Math.max(0, Math.min(100, score)));
+    // // Normalize rank to percentile (lower rank is better)
+    // // Top 10% get 90-100 score, bottom 10% get 0-10 score
+    // const percentile = (totalProjectCount - givPowerRank) / totalProjectCount;
+    // const score = percentile * 100;
+
+    // return Math.round(Math.max(0, Math.min(100, score)));
   }
 
   /**

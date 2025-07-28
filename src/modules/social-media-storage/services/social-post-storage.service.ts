@@ -594,4 +594,176 @@ export class SocialPostStorageService {
       };
     }
   }
+
+  /**
+   * Get social posts for multiple projects with project information
+   *
+   * @param projectIds - Array of project IDs to retrieve posts for
+   * @param platform - Optional platform filter
+   * @param limit - Maximum posts per project per platform
+   * @returns Promise<object> - Projects with their social posts grouped by platform
+   */
+  async getSocialPostsForMultipleProjects(
+    projectIds: string[],
+    platform?: SocialMediaPlatform,
+    limit: number = 10,
+  ): Promise<{
+    totalProjects: number;
+    projectsWithPosts: number;
+    projects: Array<{
+      projectId: string;
+      projectInfo: {
+        title: string;
+        slug: string;
+        xUrl?: string;
+        farcasterUrl?: string;
+      };
+      posts: {
+        twitter: SocialPostDto[];
+        farcaster: SocialPostDto[];
+      };
+      postCounts: {
+        twitter: number;
+        farcaster: number;
+      };
+    }>;
+  }> {
+    try {
+      if (projectIds.length === 0) {
+        return {
+          totalProjects: 0,
+          projectsWithPosts: 0,
+          projects: [],
+        };
+      }
+
+      // Get project accounts for the requested project IDs
+      const projectAccounts = await this.projectAccountRepository
+        .createQueryBuilder('account')
+        .where('account.projectId IN (:...projectIds)', { projectIds })
+        .getMany();
+
+      const foundProjectIds = new Set(
+        projectAccounts.map(account => account.projectId),
+      );
+      const missingProjectIds = projectIds.filter(
+        id => !foundProjectIds.has(id),
+      );
+
+      if (missingProjectIds.length > 0) {
+        this.logger.debug(
+          `Projects not found in database: ${missingProjectIds.join(', ')}`,
+        );
+      }
+
+      const maxAgeDays = parseInt(
+        this.configService.get('SOCIAL_POST_MAX_AGE_DAYS', '90'),
+        10,
+      );
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - maxAgeDays);
+
+      const projects: Array<{
+        projectId: string;
+        projectInfo: {
+          title: string;
+          slug: string;
+          xUrl?: string;
+          farcasterUrl?: string;
+        };
+        posts: {
+          twitter: SocialPostDto[];
+          farcaster: SocialPostDto[];
+        };
+        postCounts: {
+          twitter: number;
+          farcaster: number;
+        };
+      }> = [];
+      let projectsWithPosts = 0;
+
+      for (const account of projectAccounts) {
+        const projectResult = {
+          projectId: account.projectId,
+          projectInfo: {
+            title: account.title,
+            slug: account.slug,
+            xUrl: account.xUrl,
+            farcasterUrl: account.farcasterUrl,
+          },
+          posts: {
+            twitter: [] as SocialPostDto[],
+            farcaster: [] as SocialPostDto[],
+          },
+          postCounts: {
+            twitter: 0,
+            farcaster: 0,
+          },
+        };
+
+        // Determine which platforms to fetch
+        const platformsToFetch = platform
+          ? [platform]
+          : [SocialMediaPlatform.TWITTER, SocialMediaPlatform.FARCASTER];
+
+        for (const platformToFetch of platformsToFetch) {
+          const queryBuilder = this.storedSocialPostRepository
+            .createQueryBuilder('post')
+            .where('post.projectAccountId = :projectAccountId', {
+              projectAccountId: account.id,
+            })
+            .andWhere('post.postTimestamp >= :cutoffDate', { cutoffDate })
+            .andWhere("post.metadata->>'platform' = :platform", {
+              platform: platformToFetch,
+            })
+            .orderBy('post.postTimestamp', 'DESC')
+            .limit(limit);
+
+          const posts = await queryBuilder.getMany();
+
+          const socialPosts = posts.map(post => ({
+            id: post.postId,
+            text: post.content,
+            createdAt: post.postTimestamp,
+            platform: post.metadata?.platform as SocialMediaPlatform,
+            url: post.url,
+          }));
+
+          if (platformToFetch === SocialMediaPlatform.TWITTER) {
+            projectResult.posts.twitter = socialPosts;
+            projectResult.postCounts.twitter = socialPosts.length;
+          } else {
+            projectResult.posts.farcaster = socialPosts;
+            projectResult.postCounts.farcaster = socialPosts.length;
+          }
+        }
+
+        // Check if project has any posts
+        const hasPosts =
+          projectResult.postCounts.twitter > 0 ||
+          projectResult.postCounts.farcaster > 0;
+        if (hasPosts) {
+          projectsWithPosts++;
+        }
+
+        projects.push(projectResult);
+      }
+
+      this.logger.log(
+        `Retrieved social posts for ${projects.length} projects (${projectsWithPosts} with posts)`,
+      );
+
+      return {
+        totalProjects: projects.length,
+        projectsWithPosts,
+        projects,
+      };
+    } catch (error) {
+      this.logger.error(
+        'Failed to get social posts for multiple projects:',
+        error,
+      );
+      throw error;
+    }
+  }
 }

@@ -9,8 +9,10 @@ services:
       NODE_ENV: production
       PGSSLROOTCERT: /usr/src/app/db-ca.crt
       DATABASE_SSL_REJECT_UNAUTHORIZED: true
+      CSV_EVALUATION_LOG_PATH: /usr/src/app/data/evaluation-results.csv
     volumes:
       - ./db-ca.crt:/usr/src/app/db-ca.crt:ro
+      - ./data:/usr/src/app/data
     ports:
       - '3333:3333'
     networks:

@@ -41,18 +41,6 @@ export const PROJECT_BY_SLUG_QUERY = gql`
       #   description
       # }
 
-      # Admin user information (contains social media handles)
-      adminUser {
-        id
-        firstName
-        lastName
-        name
-        walletAddress
-        avatar
-        url
-        location
-      }
-
       # Project categories
       categories {
         id
@@ -206,11 +194,6 @@ export const PROJECTS_BY_SLUGS_QUERY = gql`
           powerRank
           totalPower
         }
-        adminUser {
-          id
-          name
-          walletAddress
-        }
         socialMedia {
           type
           link
@@ -274,13 +257,6 @@ export const ALL_CAUSES_WITH_PROJECTS_QUERY = gql`
       updatedAt
       projectType
 
-      # Admin user information (cause owner)
-      adminUser {
-        id
-        name
-        walletAddress
-      }
-
       # All projects in this cause with complete data for sync
       projects {
         id
@@ -315,18 +291,6 @@ export const ALL_CAUSES_WITH_PROJECTS_QUERY = gql`
         #   name
         #   description
         # }
-
-        # Admin user (contains social media handles)
-        adminUser {
-          id
-          firstName
-          lastName
-          name
-          walletAddress
-          avatar
-          url
-          location
-        }
 
         # Categories
         categories {
@@ -430,13 +394,6 @@ export const CAUSE_BY_ID_QUERY = gql`
       updatedAt
       projectType
 
-      # Admin user information (cause owner)
-      adminUser {
-        id
-        name
-        walletAddress
-      }
-
       # Projects in this cause (minimal data for getting slugs)
       projects {
         id
@@ -463,8 +420,6 @@ export const ALL_PROJECTS_WITH_FILTERS_QUERY = gql`
     $offset: Float
     $searchTerm: String
     $chainId: Float
-    $sortBy: String
-    $sortDirection: String
     $listingStatus: String
   ) {
     causes(
@@ -472,8 +427,6 @@ export const ALL_PROJECTS_WITH_FILTERS_QUERY = gql`
       offset: $offset
       searchTerm: $searchTerm
       chainId: $chainId
-      sortBy: $sortBy
-      sortDirection: $sortDirection
       listingStatus: $listingStatus
     ) {
       id
@@ -489,29 +442,18 @@ export const ALL_PROJECTS_WITH_FILTERS_QUERY = gql`
       updatedAt
       latestUpdateCreationDate
 
-      # Admin user information (cause owner)
-      adminUser {
-        id
-        name
-        walletAddress
-      }
-
-      # All projects in this cause with complete data for evaluation
+      # All projects in this cause with essential data for evaluation
       projects {
         id
         title
         slug
         description
-        descriptionSummary
         projectType
         qualityScore
         totalDonations
-        countUniqueDonors
         latestUpdateCreationDate
         updatedAt
         creationDate
-        totalProjectUpdates
-        image
         impactLocation
 
         # Latest project update for content analysis
@@ -526,68 +468,52 @@ export const ALL_PROJECTS_WITH_FILTERS_QUERY = gql`
 
         # Categories for relevance assessment
         categories {
-          id
           name
           value
           mainCategory {
-            id
             title
-            slug
           }
         }
 
         # Social media links for handle extraction
         socialMedia {
-          id
           type
           link
         }
 
         # Social profiles from verification
         socialProfiles {
-          id
           socialNetwork
-          name
           link
-          isVerified
-        }
-
-        # Admin user (contains social media handles)
-        adminUser {
-          id
-          firstName
-          lastName
-          name
-          walletAddress
-          avatar
-          url
-          location
         }
 
         # Power ranking information for GIVpower rank scoring
         projectPower {
-          projectId
-          totalPower
           powerRank
-          round
         }
 
-        # Instant power ranking
+        # Instant power ranking (fallback)
         projectInstantPower {
-          projectId
-          totalPower
           powerRank
         }
-
-        # Additional context fields
-        website
-        youtube
-        isGivbackEligible
-        giveBacks
-        listed
-        reviewStatus
-        verificationStatus
       }
+    }
+  }
+`;
+
+/**
+ * Mutation to bulk update cause project evaluation scores
+ * Used to send evaluation results back to Impact Graph after evaluation completion
+ */
+export const BULK_UPDATE_CAUSE_PROJECT_EVALUATION_MUTATION = gql`
+  mutation BulkUpdateCauseProjectEvaluation(
+    $updates: [UpdateCauseProjectEvaluationInput!]!
+  ) {
+    bulkUpdateCauseProjectEvaluation(updates: $updates) {
+      id
+      causeId
+      projectId
+      causeScore
     }
   }
 `;

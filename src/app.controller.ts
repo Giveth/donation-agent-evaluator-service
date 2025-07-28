@@ -22,7 +22,7 @@ export class AppController {
       'data',
       'evaluation-results.csv',
     );
-    res.download(filePath, 'evaluation-results.csv', err => {
+    res.download(filePath, 'evaluation-results.csv', (err?: Error) => {
       if (err) {
         this.logger.error('Error downloading file:', err.message);
         if (!res.headersSent) {

@@ -3,6 +3,8 @@ import { FarcasterService } from '../../social-media/services/farcaster.service'
 import { SocialPostStorageService } from '../../social-media-storage/services/social-post-storage.service';
 import { ProjectSocialAccountService } from '../../social-media-storage/services/project-social-account.service';
 import { ScheduledJob } from '../../social-media-storage/entities/scheduled-job.entity';
+import { ProjectSocialAccount } from '../../social-media-storage/entities/project-social-account.entity';
+import { SocialMediaPlatform } from '../../social-media/dto/social-post.dto';
 
 /**
  * Processor specifically for Farcaster fetching jobs.
@@ -81,7 +83,32 @@ export class FarcasterFetchProcessor {
         throw new Error(errorMsg);
       }
 
-      // Step 2: Get the latest Farcaster post timestamp for incremental fetching
+      // Step 2: Validate timestamp consistency before fetching
+      const timestampValidation = await this.validateTimestampConsistency(
+        projectId,
+        projectAccount,
+      );
+
+      if (!timestampValidation.isValid) {
+        this.logger.warn(
+          `Corrupted timestamp detected for project ${projectId}: ${timestampValidation.reason}. Resetting to allow full fetch.`,
+        );
+
+        // Reset the corrupted timestamp
+        await this.projectSocialAccountService.upsertProjectAccount(projectId, {
+          latestFarcasterPostTimestamp: undefined,
+        });
+
+        this.logger.log(
+          `Reset corrupted Farcaster timestamp for project ${projectId}. Next fetch will be full.`,
+        );
+
+        // Exit early - let the next job cycle handle the clean fetch
+        // This prevents the corrupted state from persisting
+        return;
+      }
+
+      // Step 3: Get the validated timestamp for incremental fetching
       const latestTimestamp = projectAccount.latestFarcasterPostTimestamp;
 
       this.logger.debug(
@@ -89,7 +116,7 @@ export class FarcasterFetchProcessor {
           `(Project: ${projectId}, Since: ${latestTimestamp?.toISOString() ?? 'beginning'})`,
       );
 
-      // Step 3: Fetch recent casts using incremental fetching
+      // Step 4: Fetch recent casts using incremental fetching
       const casts = await this.farcasterService.getRecentCastsIncremental(
         projectAccount.farcasterUrl,
         latestTimestamp ?? undefined,
@@ -290,6 +317,68 @@ export class FarcasterFetchProcessor {
     } catch (error) {
       this.logger.error('Failed to get fetch statistics:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Validates that a project's latestFarcasterPostTimestamp is consistent with stored posts.
+   * This prevents corruption where timestamps exist but no corresponding posts are stored.
+   *
+   * @param projectId - The project ID to validate
+   * @param projectAccount - The project account with timestamp information
+   * @returns Promise<{ isValid: boolean; reason?: string }> - validation result
+   */
+  private async validateTimestampConsistency(
+    projectId: string,
+    projectAccount: ProjectSocialAccount,
+  ): Promise<{ isValid: boolean; reason?: string }> {
+    try {
+      // If no timestamp exists, no corruption is possible
+      if (!projectAccount.latestFarcasterPostTimestamp) {
+        return { isValid: true };
+      }
+
+      // Check if any Farcaster posts exist for this project
+      const latestPostTimestamp =
+        await this.socialPostStorageService.getLatestPostTimestamp(
+          projectId,
+          SocialMediaPlatform.FARCASTER,
+        );
+
+      // If timestamp exists but no posts found, this indicates corruption
+      if (!latestPostTimestamp) {
+        return {
+          isValid: false,
+          reason: `Timestamp ${projectAccount.latestFarcasterPostTimestamp.toISOString()} exists but no Farcaster posts found`,
+        };
+      }
+
+      // Additional validation: Check if stored timestamp matches database timestamp
+      const storedTimestamp = projectAccount.latestFarcasterPostTimestamp;
+      const timeDifference = Math.abs(
+        storedTimestamp.getTime() - latestPostTimestamp.getTime(),
+      );
+
+      // Allow 1 second tolerance for potential millisecond differences
+      if (timeDifference > 1000) {
+        return {
+          isValid: false,
+          reason: `Timestamp mismatch - stored: ${storedTimestamp.toISOString()}, latest post: ${latestPostTimestamp.toISOString()}`,
+        };
+      }
+
+      this.logger.debug(
+        `Timestamp validation passed for project ${projectId} - timestamp: ${storedTimestamp.toISOString()}`,
+      );
+
+      return { isValid: true };
+    } catch (error) {
+      // If validation fails due to an error, log it but assume valid to avoid breaking the flow
+      this.logger.error(
+        `Failed to validate timestamp consistency for project ${projectId}:`,
+        error,
+      );
+      return { isValid: true }; // Fail-safe: assume valid if validation errors
     }
   }
 }

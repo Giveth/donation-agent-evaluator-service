@@ -475,8 +475,29 @@ export class TwitterService {
       if (count >= 15) break; // Safety limit
     }
 
+    // Filter out pure retweets but keep quote tweets and originals
+    const filteredTweets = tweets.filter(tweet => {
+      // Keep original tweets (not retweets)
+      if (!tweet.isRetweet) return true;
+
+      // Keep quote tweets (retweets with user commentary)
+      if (tweet.isQuoted) return true;
+
+      // Filter out pure retweets (RT without commentary)
+      return false;
+    });
+
+    const retweetsFiltered = tweets.length - filteredTweets.length;
+    if (retweetsFiltered > 0) {
+      this.logger.log(
+        `${cleanHandle} - Filtered out ${retweetsFiltered} pure retweets, keeping ${filteredTweets.length} original/quote tweets`,
+      );
+    }
+
     // Map to SocialPostDto
-    const socialPosts = tweets.map(tweet => this.mapTweetToSocialPost(tweet));
+    const socialPosts = filteredTweets.map(tweet =>
+      this.mapTweetToSocialPost(tweet),
+    );
 
     this.logger.log(
       `Successfully fetched ${socialPosts.length} tweets for ${cleanHandle}`,
@@ -1003,8 +1024,29 @@ export class TwitterService {
         }
       }
 
+      // Filter out pure retweets but keep quote tweets and originals
+      const filteredTweets = tweets.filter(tweet => {
+        // Keep original tweets (not retweets)
+        if (!tweet.isRetweet) return true;
+
+        // Keep quote tweets (retweets with user commentary)
+        if (tweet.isQuoted) return true;
+
+        // Filter out pure retweets (RT without commentary)
+        return false;
+      });
+
+      const retweetsFiltered = tweets.length - filteredTweets.length;
+      if (retweetsFiltered > 0) {
+        this.logger.log(
+          `${username} - Incremental: Filtered out ${retweetsFiltered} pure retweets, keeping ${filteredTweets.length} original/quote tweets`,
+        );
+      }
+
       // Map to SocialPostDto
-      const socialPosts = tweets.map(tweet => this.mapTweetToSocialPost(tweet));
+      const socialPosts = filteredTweets.map(tweet =>
+        this.mapTweetToSocialPost(tweet),
+      );
 
       this.logger.log(
         `Incremental fetch for ${username} completed: ${socialPosts.length} new tweets found${

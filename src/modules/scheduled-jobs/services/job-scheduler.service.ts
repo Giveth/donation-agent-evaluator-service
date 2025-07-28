@@ -25,6 +25,81 @@ export class JobSchedulerService {
   ) {}
 
   /**
+   * 15-minute cleanup job for orphaned distributed locks.
+   * Removes locks that have expired to prevent permanent deadlocks.
+   */
+  @Cron('*/15 * * * *', {
+    name: 'lock-cleanup-job',
+    timeZone: 'UTC',
+  })
+  async cleanupOrphanedLocks(): Promise<void> {
+    this.logger.log('Starting orphaned lock cleanup...');
+
+    try {
+      const now = new Date();
+
+      // Find all expired lock jobs (job types starting with 'LOCK_')
+      // These are NOT regular scheduled jobs - they're temporary distributed locks
+      const expiredLocks = await this.scheduledJobRepository
+        .createQueryBuilder('job')
+        .where("job.jobType LIKE 'LOCK_%'")
+        .andWhere('job.scheduledFor < :now', { now })
+        .getMany();
+
+      if (expiredLocks.length === 0) {
+        this.logger.debug('No orphaned locks found');
+        return;
+      }
+
+      // Log what we're about to clean to ensure we're not affecting real jobs
+      const lockTypes = expiredLocks.map(lock => lock.jobType);
+      this.logger.debug(
+        `Found expired locks to clean: ${lockTypes.join(', ')}`,
+      );
+
+      // Verify all found jobs are actually lock jobs (safety check)
+      const nonLockJobs = expiredLocks.filter(
+        job => !job.jobType.startsWith('LOCK_'),
+      );
+      if (nonLockJobs.length > 0) {
+        this.logger.error(
+          `SAFETY CHECK FAILED: Found non-lock jobs in cleanup query: ${nonLockJobs.map(j => j.jobType).join(', ')}`,
+        );
+        return; // Abort cleanup if we accidentally caught real jobs
+      }
+
+      // Delete expired locks (only those that start with 'LOCK_')
+      const deleteResult = await this.scheduledJobRepository
+        .createQueryBuilder()
+        .delete()
+        .where("jobType LIKE 'LOCK_%'")
+        .andWhere('scheduledFor < :now', { now })
+        .execute();
+
+      this.logger.log(
+        `Cleaned up ${deleteResult.affected ?? 0} orphaned locks (found ${expiredLocks.length})`,
+      );
+
+      // Log details about cleaned locks for debugging
+      if (expiredLocks.length > 0) {
+        const lockSummary = expiredLocks.reduce(
+          (acc, lock) => {
+            const lockType = lock.jobType.replace('LOCK_', '');
+            acc[lockType] = (acc[lockType] ?? 0) + 1;
+            return acc;
+          },
+          {} as Record<string, number>,
+        );
+
+        this.logger.debug('Cleaned lock types:', lockSummary);
+      }
+    } catch (error) {
+      this.logger.error('Failed to cleanup orphaned locks:', error);
+      // Don't throw - we want the cron job to continue running
+    }
+  }
+
+  /**
    * Hourly cron job that creates scheduled jobs for all projects with social media handles.
    * Runs every hour at minute 0 (top of the hour).
    *
@@ -312,6 +387,112 @@ export class JobSchedulerService {
       return result;
     } catch (error) {
       this.logger.error('Failed to manually schedule jobs:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Gets statistics about distributed locks.
+   * Useful for monitoring lock health and detecting potential issues.
+   *
+   * @returns Object containing lock statistics
+   */
+  async getLockStatistics(): Promise<{
+    activeLocks: number;
+    expiredLocks: number;
+    locksByType: Record<string, number>;
+    oldestLock?: Date;
+  }> {
+    try {
+      const now = new Date();
+
+      // Get all active locks (NOT regular scheduled jobs)
+      const activeLocks = await this.scheduledJobRepository
+        .createQueryBuilder('job')
+        .where("job.jobType LIKE 'LOCK_%'")
+        .andWhere('job.scheduledFor >= :now', { now })
+        .getMany();
+
+      // Get expired locks (NOT regular scheduled jobs)
+      const expiredLocks = await this.scheduledJobRepository
+        .createQueryBuilder('job')
+        .where("job.jobType LIKE 'LOCK_%'")
+        .andWhere('job.scheduledFor < :now', { now })
+        .getMany();
+
+      // Group locks by type
+      const allLocks = [...activeLocks, ...expiredLocks];
+      const locksByType: Record<string, number> = {};
+
+      allLocks.forEach(lock => {
+        const lockType = lock.jobType.replace('LOCK_', '');
+        locksByType[lockType] = (locksByType[lockType] ?? 0) + 1;
+      });
+
+      // Find oldest lock
+      const oldestLock =
+        allLocks.length > 0
+          ? allLocks.reduce((oldest, lock) =>
+              lock.createdAt < oldest.createdAt ? lock : oldest,
+            ).createdAt
+          : undefined;
+
+      return {
+        activeLocks: activeLocks.length,
+        expiredLocks: expiredLocks.length,
+        locksByType,
+        oldestLock,
+      };
+    } catch (error) {
+      this.logger.error('Failed to get lock statistics:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Manual method to trigger lock cleanup outside of the cron schedule.
+   * Useful for testing or admin operations.
+   *
+   * @returns Number of locks cleaned up
+   */
+  async manualCleanupLocks(): Promise<number> {
+    this.logger.log('Manual lock cleanup triggered');
+
+    try {
+      const now = new Date();
+
+      // Safety check: ensure we only delete lock jobs, not regular scheduled jobs
+      const locksToDelete = await this.scheduledJobRepository
+        .createQueryBuilder('job')
+        .where("job.jobType LIKE 'LOCK_%'")
+        .andWhere('job.scheduledFor < :now', { now })
+        .getMany();
+
+      if (locksToDelete.length === 0) {
+        this.logger.log('Manual lock cleanup: no expired locks found');
+        return 0;
+      }
+
+      // Log what we're about to delete
+      this.logger.log(
+        `Manual cleanup will delete ${locksToDelete.length} expired locks: ${locksToDelete.map(l => l.jobType).join(', ')}`,
+      );
+
+      const deleteResult = await this.scheduledJobRepository
+        .createQueryBuilder()
+        .delete()
+        .where("jobType LIKE 'LOCK_%'")
+        .andWhere('scheduledFor < :now', { now })
+        .execute();
+
+      const cleaned = deleteResult.affected ?? 0;
+      this.logger.log(
+        `Manual lock cleanup completed: ${cleaned} locks removed`,
+      );
+
+      return cleaned;
+    } catch (error) {
+      this.logger.error('Failed to manually cleanup locks:', error);
       throw error;
     }
   }

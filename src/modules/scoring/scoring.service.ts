@@ -202,7 +202,7 @@ Please provide scores for:
 
 4. FARCASTER QUALITY (0-100): Evaluate the quality of Farcaster content specifically. Consider engagement, professionalism, and value provided. If no Farcaster activity, score 0.
 
-5. RELEVANCE TO CAUSE (0-100): Overall relevance score (combination of project data, Twitter, and Farcaster).
+5. RELEVANCE TO CAUSE (0-100): Overall relevance score (combination of project data(Project Description and LATEST UPDATE and Project Title), Twitter, and Farcaster) to the cause title and description and main category and subcategories.
 
 6. TWITTER RELEVANCE (0-100): Evaluate how well Twitter posts align with the cause's mission and goals. If no Twitter activity, score 0.
 

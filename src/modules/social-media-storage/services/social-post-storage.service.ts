@@ -304,7 +304,7 @@ export class SocialPostStorageService {
         this.logger.debug(
           `Resetting Twitter timestamp for project ${lockedAccount.projectId} - no posts remaining (locked)`,
         );
-        lockedAccount.latestXPostTimestamp = undefined;
+        lockedAccount.latestXPostTimestamp = null;
         needsUpdate = true;
       }
 
@@ -325,7 +325,7 @@ export class SocialPostStorageService {
         this.logger.log(
           `Resetting Farcaster timestamp for project ${lockedAccount.projectId} - no posts remaining (locked)`,
         );
-        lockedAccount.latestFarcasterPostTimestamp = undefined;
+        lockedAccount.latestFarcasterPostTimestamp = null;
         needsUpdate = true;
       }
 
@@ -1051,7 +1051,7 @@ export class SocialPostStorageService {
               platform: SocialMediaPlatform.TWITTER,
               timestamp: project.latestXPostTimestamp,
             });
-            project.latestXPostTimestamp = undefined;
+            project.latestXPostTimestamp = null;
             needsUpdate = true;
           }
         }
@@ -1078,7 +1078,7 @@ export class SocialPostStorageService {
               platform: SocialMediaPlatform.FARCASTER,
               timestamp: project.latestFarcasterPostTimestamp,
             });
-            project.latestFarcasterPostTimestamp = undefined;
+            project.latestFarcasterPostTimestamp = null;
             needsUpdate = true;
           }
         }

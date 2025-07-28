@@ -26,8 +26,8 @@ export interface ProjectAccountData {
   farcasterUrl?: string;
   lastXFetch?: Date;
   lastFarcasterFetch?: Date;
-  latestXPostTimestamp?: Date;
-  latestFarcasterPostTimestamp?: Date;
+  latestXPostTimestamp?: Date | null;
+  latestFarcasterPostTimestamp?: Date | null;
   metadata?: Record<string, unknown>;
 }
 

@@ -96,7 +96,7 @@ export class FarcasterFetchProcessor {
 
         // Reset the corrupted timestamp
         await this.projectSocialAccountService.upsertProjectAccount(projectId, {
-          latestFarcasterPostTimestamp: undefined,
+          latestFarcasterPostTimestamp: null,
         });
 
         this.logger.log(

@@ -1,4 +1,5 @@
 import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   ProjectDetailsDto,
   ProjectSocialMediaDto,
@@ -19,6 +20,7 @@ export class DataFetchingService {
   constructor(
     private readonly projectSocialAccountService: ProjectSocialAccountService,
     private readonly impactGraphService: ImpactGraphService,
+    private readonly configService: ConfigService,
   ) {}
 
   /**
@@ -336,6 +338,15 @@ export class DataFetchingService {
    */
   async getTopPowerRank(): Promise<number | null> {
     try {
+      // Return 100 for staging environment to fix staging-specific issues
+      const isStaging = this.configService.get<boolean>('IS_STAGING', false);
+      if (isStaging) {
+        this.logger.debug(
+          'Staging environment detected - returning fixed top power rank: 100',
+        );
+        return 100;
+      }
+
       this.logger.debug('Fetching top power rank for scoring normalization');
       const topPowerRank = await this.impactGraphService.getTopPowerRank();
       this.logger.debug(

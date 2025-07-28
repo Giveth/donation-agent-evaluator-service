@@ -127,8 +127,8 @@ export class SocialPostStorageService {
         `Stored ${storedPosts.length} new social posts for project ${projectId}`,
       );
 
-      // Clean up old posts after successful storage
-      await this.cleanupOldSocialPosts(projectId);
+      // Clean up old posts after successful storage (exclude the platform we just stored)
+      await this.cleanupOldSocialPosts(projectId, latestPost.platform);
     } catch (error) {
       await queryRunner.rollbackTransaction();
       this.logger.error(
@@ -190,7 +190,10 @@ export class SocialPostStorageService {
     }));
   }
 
-  private async cleanupOldSocialPosts(projectId: string): Promise<void> {
+  private async cleanupOldSocialPosts(
+    projectId: string,
+    excludePlatform?: SocialMediaPlatform,
+  ): Promise<void> {
     try {
       const projectAccount = await this.projectAccountRepository.findOne({
         where: { projectId },
@@ -222,13 +225,25 @@ export class SocialPostStorageService {
         .andWhere('postTimestamp < :cutoffDate', { cutoffDate })
         .execute();
 
-      // Keep only the most recent posts within the age limit
-      const recentPosts = await this.storedSocialPostRepository
+      // Keep only the most recent posts within the age limit (excluding the platform we just stored)
+      const queryBuilder = this.storedSocialPostRepository
         .createQueryBuilder('post')
         .where('post.projectAccountId = :projectAccountId', {
           projectAccountId: projectAccount.id,
         })
-        .andWhere('post.postTimestamp >= :cutoffDate', { cutoffDate })
+        .andWhere('post.postTimestamp >= :cutoffDate', { cutoffDate });
+
+      // Exclude the platform we just stored to prevent deleting newly stored posts
+      if (excludePlatform) {
+        queryBuilder.andWhere(
+          "post.metadata->>'platform' != :excludePlatform",
+          {
+            excludePlatform,
+          },
+        );
+      }
+
+      const recentPosts = await queryBuilder
         .orderBy('post.postTimestamp', 'DESC')
         .getMany();
 
@@ -529,8 +544,8 @@ export class SocialPostStorageService {
         }`,
       );
 
-      // Clean up old posts after successful storage
-      await this.cleanupOldSocialPosts(projectId);
+      // Clean up old posts after successful storage (exclude the platform we just stored)
+      await this.cleanupOldSocialPosts(projectId, latestPost.platform);
 
       return {
         stored: storedPosts.length,

@@ -64,6 +64,19 @@ export class TwitterService {
   private readonly baseRetryDelay: number;
   private lastRequestTime: number = 0;
 
+  // Twitter account credentials
+  private readonly account1: {
+    username: string | undefined;
+    password: string | undefined;
+    email: string | undefined;
+  };
+  private readonly account2: {
+    username: string | undefined;
+    password: string | undefined;
+    email: string | undefined;
+  };
+  private currentAccountNumber: 1 | 2 = 1;
+
   constructor(private readonly configService: ConfigService) {
     // Initialize the scraper
     this.scraper = new Scraper();
@@ -81,8 +94,23 @@ export class TwitterService {
     this.baseRetryDelay =
       this.configService.get<number>('TWITTER_BASE_RETRY_DELAY_MS') ?? 5000; // 5 seconds
 
+    // Initialize Twitter account credentials
+    this.account1 = {
+      username: this.configService.get<string>('TWITTER_USERNAME'),
+      password: this.configService.get<string>('TWITTER_PASSWORD'),
+      email: this.configService.get<string>('TWITTER_EMAIL'),
+    };
+    this.account2 = {
+      username: this.configService.get<string>('TWITTER_USERNAME_2'),
+      password: this.configService.get<string>('TWITTER_PASSWORD_2'),
+      email: this.configService.get<string>('TWITTER_EMAIL_2'),
+    };
+
     this.logger.log(
       `TwitterService initialized with rate limiting: ${this.minDelayBetweenRequests}-${this.maxDelayBetweenRequests}ms delays, ${this.maxRetries} retries`,
+    );
+    this.logger.log(
+      `Available Twitter accounts: Account1=${this.hasValidCredentials(this.account1) ? '✓' : '❌'}, Account2=${this.hasValidCredentials(this.account2) ? '✓' : '❌'}`,
     );
 
     // Initialize authentication
@@ -303,34 +331,152 @@ export class TwitterService {
   }
 
   /**
+   * Checks if an account has valid credentials.
+   */
+  private hasValidCredentials(account: {
+    username: string | undefined;
+    password: string | undefined;
+    email: string | undefined;
+  }): boolean {
+    return !!(account.username && account.password && account.email);
+  }
+
+  /**
+   * Randomly selects a Twitter account for authentication.
+   * Returns 1 or 2 based on random selection.
+   */
+  private selectRandomAccount(): 1 | 2 {
+    const availableAccounts: Array<1 | 2> = [];
+
+    if (this.hasValidCredentials(this.account1)) {
+      availableAccounts.push(1);
+    }
+    if (this.hasValidCredentials(this.account2)) {
+      availableAccounts.push(2);
+    }
+
+    if (availableAccounts.length === 0) {
+      this.logger.warn('⚠️ No valid Twitter accounts available');
+      return 1; // Default to account 1
+    }
+
+    // Random selection from available accounts
+    const selectedAccount =
+      availableAccounts[Math.floor(Math.random() * availableAccounts.length)];
+    this.logger.log(
+      `🎲 Randomly selected Twitter account ${selectedAccount} for authentication`,
+    );
+    return selectedAccount;
+  }
+
+  /**
+   * Gets the alternative account number for fallback.
+   */
+  private getAlternativeAccount(currentAccount: 1 | 2): 1 | 2 {
+    return currentAccount === 1 ? 2 : 1;
+  }
+
+  /**
+   * Gets account credentials by account number.
+   */
+  private getAccountCredentials(accountNumber: 1 | 2): {
+    username: string | undefined;
+    password: string | undefined;
+    email: string | undefined;
+  } {
+    return accountNumber === 1 ? this.account1 : this.account2;
+  }
+
+  /**
    * Attempts authentication using username/password credentials.
+   * Uses random account selection with automatic fallback.
    */
   private async authenticateWithPassword(): Promise<boolean> {
-    try {
-      const username = this.configService.get<string>('TWITTER_USERNAME');
-      const password = this.configService.get<string>('TWITTER_PASSWORD');
-      const email = this.configService.get<string>('TWITTER_EMAIL');
-      // Username logging removed for security
-      if (!username || !password || !email) {
+    // Check if we have any valid accounts before attempting authentication
+    const hasAccount1 = this.hasValidCredentials(this.account1);
+    const hasAccount2 = this.hasValidCredentials(this.account2);
+
+    if (!hasAccount1 && !hasAccount2) {
+      this.logger.warn(
+        '⚠️ No valid Twitter account credentials available for password authentication',
+      );
+      return false;
+    }
+
+    // First, randomly select an account to try
+    this.currentAccountNumber = this.selectRandomAccount();
+
+    // Try the randomly selected account first
+    let success = await this.tryAuthenticateWithAccount(
+      this.currentAccountNumber,
+    );
+
+    if (!success) {
+      // If first account failed, try the alternative account
+      const alternativeAccount = this.getAlternativeAccount(
+        this.currentAccountNumber,
+      );
+      if (
+        this.hasValidCredentials(this.getAccountCredentials(alternativeAccount))
+      ) {
+        this.logger.log(
+          `⚡ Falling back to Twitter account ${alternativeAccount}...`,
+        );
+        this.currentAccountNumber = alternativeAccount;
+        success = await this.tryAuthenticateWithAccount(alternativeAccount);
+      } else {
         this.logger.warn(
-          '⚠️ Twitter credentials not provided. Please set TWITTER_USERNAME, TWITTER_PASSWORD, and TWITTER_EMAIL environment variables.',
+          `⚠️ Alternative Twitter account ${alternativeAccount} has invalid credentials, cannot fallback`,
+        );
+      }
+    }
+
+    if (success) {
+      // Save cookies after successful login
+      const cookies = await this.scraper.getCookies();
+      this.saveCookiesToFile(cookies);
+      this.logger.log(
+        `💾 Saved authentication cookies for future use (Account ${this.currentAccountNumber})`,
+      );
+    }
+
+    return success;
+  }
+
+  /**
+   * Attempts authentication with a specific account number.
+   */
+  private async tryAuthenticateWithAccount(
+    accountNumber: 1 | 2,
+  ): Promise<boolean> {
+    try {
+      const account = this.getAccountCredentials(accountNumber);
+
+      if (!this.hasValidCredentials(account)) {
+        this.logger.warn(
+          `⚠️ Twitter account ${accountNumber} credentials not provided or incomplete.`,
         );
         return false;
       }
 
-      this.logger.log('🔐 Attempting password authentication...');
+      this.logger.log(
+        `🔐 Attempting password authentication with account ${accountNumber}...`,
+      );
 
-      await this.scraper.login(username, password, email);
+      await this.scraper.login(
+        account.username!,
+        account.password!,
+        account.email,
+      );
 
-      // Save cookies after successful login
-      const cookies = await this.scraper.getCookies();
-      // Removed verbose cookie logging for production
-      this.saveCookiesToFile(cookies);
-      this.logger.log('💾 Saved authentication cookies for future use');
-
+      this.logger.log(
+        `✅ Password authentication successful with account ${accountNumber}`,
+      );
       return true;
     } catch (error) {
-      this.logger.error(`❌ Password authentication failed: ${error.message}`);
+      this.logger.error(
+        `❌ Password authentication failed with account ${accountNumber}: ${error.message}`,
+      );
       return false;
     }
   }
@@ -888,19 +1034,19 @@ export class TwitterService {
   async getAuthStatus(): Promise<{
     isAuthenticated: boolean;
     isLoggedIn: boolean;
-    credentialsProvided: boolean;
+    account1CredentialsProvided: boolean;
+    account2CredentialsProvided: boolean;
+    currentAccountNumber: 1 | 2;
     cookiesFileExists: boolean;
   }> {
     await this.ensureAuthenticated();
 
-    const username = this.configService.get<string>('TWITTER_USERNAME');
-    const password = this.configService.get<string>('TWITTER_PASSWORD');
-    const email = this.configService.get<string>('TWITTER_EMAIL');
-
     return {
       isAuthenticated: this.isAuthenticated,
       isLoggedIn: await this.isLoggedIn(),
-      credentialsProvided: !!(username && password && email),
+      account1CredentialsProvided: this.hasValidCredentials(this.account1),
+      account2CredentialsProvided: this.hasValidCredentials(this.account2),
+      currentAccountNumber: this.currentAccountNumber,
       cookiesFileExists: fs.existsSync(this.cookiesFilePath),
     };
   }

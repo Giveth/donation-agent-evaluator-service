@@ -8,32 +8,22 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
-export class MainCategoryDto {
-  @IsString()
-  @IsNotEmpty()
-  title: string;
-
-  @IsString()
-  @IsNotEmpty()
-  slug: string;
-
-  @IsOptional()
-  @IsString()
-  banner?: string;
-
-  @IsString()
-  @IsNotEmpty()
-  description: string;
-}
-
 export class CategoryDto {
   @IsString()
   @IsNotEmpty()
-  name: string;
+  category_name: string;
 
-  @ValidateNested()
-  @Type(() => MainCategoryDto)
-  mainCategory: MainCategoryDto;
+  @IsString()
+  @IsNotEmpty()
+  category_description: string;
+
+  @IsString()
+  @IsNotEmpty()
+  maincategory_title: string;
+
+  @IsString()
+  @IsNotEmpty()
+  maincategory_description: string;
 }
 
 export class CauseDto {

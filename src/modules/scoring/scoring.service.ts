@@ -169,13 +169,22 @@ Be objective and consistent in your scoring. Consider professionalism, clarity, 
         post => post.platform === SocialMediaPlatform.FARCASTER,
       );
 
+      // Format category information for better LLM understanding
+      const categoryInfo =
+        input.causeCategories
+          ?.map(
+            cat =>
+              `- ${cat.category_name} (${cat.category_description}) - Main Category: ${cat.maincategory_title} (${cat.maincategory_description})`,
+          )
+          .join('\n') ?? 'No categories specified';
+
       const userPrompt = `Please evaluate the following project for a charitable cause:
 
 CAUSE INFORMATION:
 Title: ${input.causeTitle}
 Description: ${input.causeDescription}
-Category: ${input.causeMainCategory ?? 'General'}
-Subcategories: ${input.causeSubCategories?.join(', ') ?? 'None'}
+Categories:
+${categoryInfo}
 
 PROJECT INFORMATION:
 Title: ${input.projectTitle}
@@ -202,13 +211,13 @@ Please provide scores for:
 
 4. FARCASTER QUALITY (0-100): Evaluate the quality of Farcaster content specifically. Consider engagement, professionalism, and value provided. If no Farcaster activity, score 0.
 
-5. RELEVANCE TO CAUSE (0-100): Overall relevance score (combination of project data(Project Description and LATEST UPDATE and Project Title), Twitter, and Farcaster) to the cause title and description and main category and subcategories.
+5. RELEVANCE TO CAUSE (0-100): Overall relevance score (combination of project data(Project Description and LATEST UPDATE and Project Title), Twitter, and Farcaster) to the cause title, description, and all specified categories with their descriptions.
 
-6. TWITTER RELEVANCE (0-100): Evaluate how well Twitter posts align with the cause's mission and goals. If no Twitter activity, score 0.
+6. TWITTER RELEVANCE (0-100): Evaluate how well Twitter posts align with the cause's mission, goals, and specified categories. If no Twitter activity, score 0.
 
-7. FARCASTER RELEVANCE (0-100): Evaluate how well Farcaster posts align with the cause's mission and goals. If no Farcaster activity, score 0.
+7. FARCASTER RELEVANCE (0-100): Evaluate how well Farcaster posts align with the cause's mission, goals, and specified categories. If no Farcaster activity, score 0.
 
-8. PROJECT RELEVANCE (0-100): Evaluate how well the project information aligns with the cause's mission and goals based on project description and updates.
+8. PROJECT RELEVANCE (0-100): Evaluate how well the project information aligns with the cause's mission, goals, and specified categories based on project description and updates.
 
 9. EVIDENCE OF IMPACT (0-100): Evaluate evidence of social/environmental impact or philanthropic action demonstrated in project updates, Twitter posts, and Farcaster posts. Look for concrete examples of positive impact, beneficiaries helped, or meaningful change created.
 

@@ -195,8 +195,7 @@ export class EvaluationService {
       totalProjectCount: topPowerRank, // null if topPowerRank query failed - scoring service will handle this
       causeTitle: cause.title,
       causeDescription: cause.description,
-      // Note: causeMainCategory and causeSubCategories would need to be fetched
-      // from the cause if available in the Impact-Graph schema
+      causeCategories: cause.categories,
     });
 
     // Calculate scores using the scoring service

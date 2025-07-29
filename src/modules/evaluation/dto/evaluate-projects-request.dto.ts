@@ -3,9 +3,38 @@ import {
   IsString,
   IsNumber,
   IsArray,
+  IsOptional,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+
+export class MainCategoryDto {
+  @IsString()
+  @IsNotEmpty()
+  title: string;
+
+  @IsString()
+  @IsNotEmpty()
+  slug: string;
+
+  @IsOptional()
+  @IsString()
+  banner?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  description: string;
+}
+
+export class CategoryDto {
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @ValidateNested()
+  @Type(() => MainCategoryDto)
+  mainCategory: MainCategoryDto;
+}
 
 export class CauseDto {
   @IsNumber()
@@ -19,6 +48,12 @@ export class CauseDto {
   @IsString()
   @IsNotEmpty()
   description: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CategoryDto)
+  categories?: CategoryDto[];
 }
 
 export class EvaluateProjectsRequestDto {

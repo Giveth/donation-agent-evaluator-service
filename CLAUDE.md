@@ -46,7 +46,10 @@ npm run test:debug         # Debug tests
 The TwitterService uses `@the-convocation/twitter-scraper` with dual authentication:
 
 1. **Cookie-based authentication** (primary) - uses saved cookies from `twitter_cookies.json`
-2. **Password authentication** (fallback) - requires `TWITTER_USERNAME`, `TWITTER_PASSWORD`, `TWITTER_EMAIL`
+2. **Password authentication** (fallback) - supports dual accounts with random selection and automatic fallback:
+   - Account 1: `TWITTER_USERNAME`, `TWITTER_PASSWORD`, `TWITTER_EMAIL`
+   - Account 2: `TWITTER_USERNAME_2`, `TWITTER_PASSWORD_2`, `TWITTER_EMAIL_2`
+   - Randomly selects between accounts, with automatic fallback to the other account if the first fails
 
 ### Scoring Rubric (Total: 100%)
 
@@ -72,10 +75,15 @@ CACHE_TTL_SOCIAL_MEDIA=21600  # 6 hours in seconds
 # Twitter Authentication (Method 1: Cookies)
 TWITTER_COOKIES='[{"name":"auth_token","value":"..."}]'
 
-# Twitter Authentication (Method 2: Credentials)
+# Twitter Authentication (Method 2: Credentials - Account 1)
 TWITTER_USERNAME=your_username
 TWITTER_PASSWORD=your_password
 TWITTER_EMAIL=your_email
+
+# Twitter Authentication (Method 2: Credentials - Account 2)
+TWITTER_USERNAME_2=your_username_2
+TWITTER_PASSWORD_2=your_password_2
+TWITTER_EMAIL_2=your_email_2
 
 # Twitter Rate Limiting
 TWITTER_MIN_DELAY_MS=3000

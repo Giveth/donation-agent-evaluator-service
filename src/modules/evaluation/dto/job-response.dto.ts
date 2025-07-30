@@ -1,11 +1,18 @@
 import { IsString, IsOptional, IsNumber } from 'class-validator';
 
+export enum JobStatusType {
+  QUEUED = 'queued',
+  PROCESSING = 'processing',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+}
+
 export class JobResponseDto {
   @IsString()
   jobId: string;
 
   @IsString()
-  status: 'queued' | 'processing' | 'completed' | 'failed';
+  status: JobStatusType;
 
   @IsOptional()
   @IsString()

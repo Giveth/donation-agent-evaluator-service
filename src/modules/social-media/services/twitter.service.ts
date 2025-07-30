@@ -82,7 +82,11 @@ export class TwitterService {
     this.scraper = new Scraper();
 
     // Set up cookies file path
-    this.cookiesFilePath = path.join(process.cwd(), 'twitter_cookies.json');
+    this.cookiesFilePath = path.join(
+      process.cwd(),
+      'cookies',
+      'twitter_cookies.json',
+    );
 
     // Rate limiting configuration - conservative values to avoid detection
     this.minDelayBetweenRequests =

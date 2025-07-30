@@ -13,6 +13,7 @@ services:
     volumes:
       - ./db-ca.crt:/usr/src/app/db-ca.crt:ro
       - ./data:/usr/src/app/data
+      - ./twitter_cookies.json:/usr/src/app/twitter_cookies.json
     ports:
       - '3333:3333'
     networks:

@@ -25,15 +25,30 @@ export class JobSchedulerService {
   ) {}
 
   /**
-   * 15-minute cleanup job for orphaned distributed locks.
-   * Removes locks that have expired to prevent permanent deadlocks.
+   * 15-minute cleanup job for orphaned distributed locks and stuck evaluation jobs.
+   * Removes locks that have expired and resets evaluation jobs stuck in PROCESSING state.
    */
   @Cron('*/15 * * * *', {
-    name: 'lock-cleanup-job',
+    name: 'orphaned-job-cleanup',
     timeZone: 'UTC',
   })
-  async cleanupOrphanedLocks(): Promise<void> {
-    this.logger.log('Starting orphaned lock cleanup...');
+  async cleanupOrphanedJobs(): Promise<void> {
+    this.logger.log('Starting orphaned job cleanup...');
+
+    try {
+      await this.cleanupOrphanedLocks();
+      await this.cleanupStuckEvaluationJobs();
+    } catch (error) {
+      this.logger.error('Failed to cleanup orphaned jobs:', error);
+      // Don't throw - we want the cron job to continue running
+    }
+  }
+
+  /**
+   * Cleanup orphaned distributed locks
+   */
+  private async cleanupOrphanedLocks(): Promise<void> {
+    this.logger.debug('Cleaning up orphaned locks...');
 
     try {
       const now = new Date();
@@ -96,6 +111,65 @@ export class JobSchedulerService {
     } catch (error) {
       this.logger.error('Failed to cleanup orphaned locks:', error);
       // Don't throw - we want the cron job to continue running
+    }
+  }
+
+  /**
+   * Cleanup evaluation jobs stuck in PROCESSING state
+   */
+  private async cleanupStuckEvaluationJobs(): Promise<void> {
+    this.logger.debug('Cleaning up stuck evaluation jobs...');
+
+    try {
+      // Find evaluation jobs stuck in PROCESSING for more than 30 minutes
+      const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+
+      const stuckJobs = await this.scheduledJobRepository
+        .createQueryBuilder('job')
+        .where('job.jobType IN (:...types)', {
+          types: [
+            JobType.SINGLE_CAUSE_EVALUATION,
+            JobType.MULTI_CAUSE_EVALUATION,
+          ],
+        })
+        .andWhere('job.status = :status', { status: JobStatus.PROCESSING })
+        .andWhere('job.processedAt < :cutoff', { cutoff: thirtyMinutesAgo })
+        .getMany();
+
+      if (stuckJobs.length === 0) {
+        this.logger.debug('No stuck evaluation jobs found');
+        return;
+      }
+
+      this.logger.warn(
+        `Found ${stuckJobs.length} stuck evaluation jobs, resetting to PENDING`,
+      );
+
+      // Reset stuck jobs back to PENDING status
+      const resetResult = await this.scheduledJobRepository
+        .createQueryBuilder()
+        .update()
+        .set({
+          status: JobStatus.PENDING,
+          processedAt: undefined,
+          error: undefined,
+        })
+        .where('id IN (:...ids)', { ids: stuckJobs.map(job => job.id) })
+        .execute();
+
+      this.logger.log(
+        `Reset ${resetResult.affected ?? 0} stuck evaluation jobs back to PENDING`,
+      );
+
+      // Log details for monitoring
+      stuckJobs.forEach(job => {
+        this.logger.debug(
+          `Reset stuck job ${job.id} (${job.jobType}) - was processing since ${job.processedAt}`,
+        );
+      });
+    } catch (error) {
+      this.logger.error('Failed to cleanup stuck evaluation jobs:', error);
+      // Don't throw - continue with other cleanup tasks
     }
   }
 
@@ -450,49 +524,71 @@ export class JobSchedulerService {
   }
 
   /**
-   * Manual method to trigger lock cleanup outside of the cron schedule.
+   * Manual method to trigger job cleanup outside of the cron schedule.
    * Useful for testing or admin operations.
    *
-   * @returns Number of locks cleaned up
+   * @returns Number of items cleaned up (locks + stuck jobs)
    */
-  async manualCleanupLocks(): Promise<number> {
-    this.logger.log('Manual lock cleanup triggered');
+  async manualCleanupJobs(): Promise<{ locks: number; stuckJobs: number }> {
+    this.logger.log('Manual job cleanup triggered');
 
     try {
+      // Cleanup locks
       const now = new Date();
-
-      // Safety check: ensure we only delete lock jobs, not regular scheduled jobs
       const locksToDelete = await this.scheduledJobRepository
         .createQueryBuilder('job')
         .where("job.job_type::text LIKE 'LOCK_%'")
         .andWhere('job.scheduledFor < :now', { now })
         .getMany();
 
-      if (locksToDelete.length === 0) {
-        this.logger.log('Manual lock cleanup: no expired locks found');
-        return 0;
+      let locksCleaned = 0;
+      if (locksToDelete.length > 0) {
+        const deleteResult = await this.scheduledJobRepository
+          .createQueryBuilder()
+          .delete()
+          .where("job_type::text LIKE 'LOCK_%'")
+          .andWhere('scheduledFor < :now', { now })
+          .execute();
+        locksCleaned = deleteResult.affected ?? 0;
       }
 
-      // Log what we're about to delete
+      // Cleanup stuck evaluation jobs
+      const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+      const stuckJobs = await this.scheduledJobRepository
+        .createQueryBuilder('job')
+        .where('job.jobType IN (:...types)', {
+          types: [
+            JobType.SINGLE_CAUSE_EVALUATION,
+            JobType.MULTI_CAUSE_EVALUATION,
+          ],
+        })
+        .andWhere('job.status = :status', { status: JobStatus.PROCESSING })
+        .andWhere('job.processedAt < :cutoff', { cutoff: thirtyMinutesAgo })
+        .getMany();
+
+      let stuckJobsCleaned = 0;
+      if (stuckJobs.length > 0) {
+        const resetResult = await this.scheduledJobRepository
+          .createQueryBuilder()
+          .update()
+          .set({
+            status: JobStatus.PENDING,
+            processedAt: undefined,
+            error: undefined,
+          })
+          .where('id IN (:...ids)', { ids: stuckJobs.map(job => job.id) })
+          .execute();
+        stuckJobsCleaned = resetResult.affected ?? 0;
+      }
+
+      const result = { locks: locksCleaned, stuckJobs: stuckJobsCleaned };
       this.logger.log(
-        `Manual cleanup will delete ${locksToDelete.length} expired locks: ${locksToDelete.map(l => l.jobType).join(', ')}`,
+        `Manual cleanup completed: ${result.locks} locks removed, ${result.stuckJobs} stuck jobs reset`,
       );
 
-      const deleteResult = await this.scheduledJobRepository
-        .createQueryBuilder()
-        .delete()
-        .where("job_type::text LIKE 'LOCK_%'")
-        .andWhere('scheduledFor < :now', { now })
-        .execute();
-
-      const cleaned = deleteResult.affected ?? 0;
-      this.logger.log(
-        `Manual lock cleanup completed: ${cleaned} locks removed`,
-      );
-
-      return cleaned;
+      return result;
     } catch (error) {
-      this.logger.error('Failed to manually cleanup locks:', error);
+      this.logger.error('Failed to manually cleanup jobs:', error);
       throw error;
     }
   }
@@ -542,6 +638,8 @@ export class JobSchedulerService {
         [JobType.TWEET_FETCH]: 0,
         [JobType.FARCASTER_FETCH]: 0,
         [JobType.PROJECT_SYNC]: 0,
+        [JobType.SINGLE_CAUSE_EVALUATION]: 0,
+        [JobType.MULTI_CAUSE_EVALUATION]: 0,
       };
 
       // Populate job type counts
@@ -558,6 +656,91 @@ export class JobSchedulerService {
       };
     } catch (error) {
       this.logger.error('Failed to get job statistics:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Gets evaluation job statistics specifically
+   * Useful for monitoring evaluation job health
+   *
+   * @returns Object containing evaluation job statistics
+   */
+  async getEvaluationJobStatistics(): Promise<{
+    pendingEvaluations: number;
+    processingEvaluations: number;
+    completedEvaluations: number;
+    failedEvaluations: number;
+    singleCauseJobs: number;
+    multiCauseJobs: number;
+  }> {
+    try {
+      const [
+        pendingEvaluations,
+        processingEvaluations,
+        completedEvaluations,
+        failedEvaluations,
+        singleCauseJobs,
+        multiCauseJobs,
+      ] = await Promise.all([
+        this.scheduledJobRepository
+          .createQueryBuilder('job')
+          .where('job.jobType IN (:...types)', {
+            types: [
+              JobType.SINGLE_CAUSE_EVALUATION,
+              JobType.MULTI_CAUSE_EVALUATION,
+            ],
+          })
+          .andWhere('job.status = :status', { status: JobStatus.PENDING })
+          .getCount(),
+        this.scheduledJobRepository
+          .createQueryBuilder('job')
+          .where('job.jobType IN (:...types)', {
+            types: [
+              JobType.SINGLE_CAUSE_EVALUATION,
+              JobType.MULTI_CAUSE_EVALUATION,
+            ],
+          })
+          .andWhere('job.status = :status', { status: JobStatus.PROCESSING })
+          .getCount(),
+        this.scheduledJobRepository
+          .createQueryBuilder('job')
+          .where('job.jobType IN (:...types)', {
+            types: [
+              JobType.SINGLE_CAUSE_EVALUATION,
+              JobType.MULTI_CAUSE_EVALUATION,
+            ],
+          })
+          .andWhere('job.status = :status', { status: JobStatus.COMPLETED })
+          .getCount(),
+        this.scheduledJobRepository
+          .createQueryBuilder('job')
+          .where('job.jobType IN (:...types)', {
+            types: [
+              JobType.SINGLE_CAUSE_EVALUATION,
+              JobType.MULTI_CAUSE_EVALUATION,
+            ],
+          })
+          .andWhere('job.status = :status', { status: JobStatus.FAILED })
+          .getCount(),
+        this.scheduledJobRepository.count({
+          where: { jobType: JobType.SINGLE_CAUSE_EVALUATION },
+        }),
+        this.scheduledJobRepository.count({
+          where: { jobType: JobType.MULTI_CAUSE_EVALUATION },
+        }),
+      ]);
+
+      return {
+        pendingEvaluations,
+        processingEvaluations,
+        completedEvaluations,
+        failedEvaluations,
+        singleCauseJobs,
+        multiCauseJobs,
+      };
+    } catch (error) {
+      this.logger.error('Failed to get evaluation job statistics:', error);
       throw error;
     }
   }

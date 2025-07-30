@@ -4,61 +4,58 @@ import {
   Get,
   Body,
   Query,
+  Param,
   Logger,
   ValidationPipe,
   UsePipes,
-  UseInterceptors,
 } from '@nestjs/common';
-import { EvaluationService } from './evaluation.service';
+import { EvaluationQueueService } from './services/evaluation-queue.service';
 import { EvaluateProjectsRequestDto } from './dto/evaluate-projects-request.dto';
-import { EvaluationResultDto } from './dto/evaluation-result.dto';
 import { EvaluateMultipleCausesRequestDto } from './dto/evaluate-multiple-causes-request.dto';
-import { MultiCauseEvaluationResultDto } from './dto/multi-cause-evaluation-result.dto';
 import { EvaluationDetailedQueryDto } from './dto/evaluation-detailed-query.dto';
 import { EvaluationDetailedResponseDto } from './dto/evaluation-detailed-response.dto';
+import { JobResponseDto } from './dto/job-response.dto';
+import { JobStatusDto } from './dto/job-status.dto';
 import { CsvLoggerService, CsvRowData } from './services/csv-logger.service';
-import { TimeoutInterceptor } from '../../core/common/interceptors/timeout.interceptor';
 
 @Controller('evaluate')
 export class EvaluationController {
   private readonly logger = new Logger(EvaluationController.name);
 
   constructor(
-    private readonly evaluationService: EvaluationService,
+    private readonly evaluationQueueService: EvaluationQueueService,
     private readonly csvLoggerService: CsvLoggerService,
   ) {}
 
   /**
-   * Evaluates projects within a cause and returns sorted scores.
+   * Queues evaluation of projects within a cause and returns job ID for tracking.
    * Uses stored social media posts from database instead of live API calls.
    *
    * @param request - Contains cause details and project IDs to evaluate
-   * @returns EvaluationResultDto - Sorted projects with scores and metadata
+   * @returns JobResponseDto - Job ID and estimated duration for tracking
    */
   @Post('cause')
-  @UseInterceptors(new TimeoutInterceptor()) // Dynamic timeout based on project count
   @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
   async evaluateProjects(
     @Body() request: EvaluateProjectsRequestDto,
-  ): Promise<EvaluationResultDto> {
+  ): Promise<JobResponseDto> {
     this.logger.log(
-      `Received evaluation request for cause ${request.cause.id} (${request.cause.title}) with ${request.projectIds.length} projects`,
+      `Received async evaluation request for cause ${request.cause.id} (${request.cause.title}) with ${request.projectIds.length} projects`,
     );
 
     try {
-      const result =
-        await this.evaluationService.evaluateProjectsWithMetadata(request);
+      const jobResponse =
+        await this.evaluationQueueService.addSingleCauseJob(request);
 
       this.logger.log(
-        `Evaluation completed for cause ${request.cause.id}. ` +
-          `${result.projectsWithStoredPosts}/${result.totalProjects} projects had stored posts. ` +
-          `Duration: ${result.evaluationDuration}ms`,
+        `Evaluation job queued for cause ${request.cause.id} with job ID ${jobResponse.jobId}. ` +
+          `Estimated duration: ${jobResponse.estimatedDuration}`,
       );
 
-      return result;
+      return jobResponse;
     } catch (error) {
       this.logger.error(
-        `Failed to evaluate projects for cause ${request.cause.id}:`,
+        `Failed to queue evaluation for cause ${request.cause.id}:`,
         error,
       );
       throw error;
@@ -66,35 +63,67 @@ export class EvaluationController {
   }
 
   /**
-   * Evaluates multiple causes with their associated projects and returns results grouped by cause.
+   * Queues evaluation of multiple causes and returns job ID for tracking.
    * Uses stored social media posts from database instead of live API calls.
    *
    * @param request - Contains array of cause evaluation requests
-   * @returns MultiCauseEvaluationResultDto - Results grouped by cause with aggregated metadata
+   * @returns JobResponseDto - Job ID and estimated duration for tracking
    */
   @Post('causes')
-  @UseInterceptors(new TimeoutInterceptor()) // Dynamic timeout based on total project count
   @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
   async evaluateMultipleCauses(
     @Body() request: EvaluateMultipleCausesRequestDto,
-  ): Promise<MultiCauseEvaluationResultDto> {
+  ): Promise<JobResponseDto> {
+    const totalProjects = request.causes.reduce(
+      (sum, cause) => sum + cause.projectIds.length,
+      0,
+    );
+
     this.logger.log(
-      `Received multi-cause evaluation request for ${request.causes.length} causes`,
+      `Received async multi-cause evaluation request for ${request.causes.length} causes with ${totalProjects} total projects`,
     );
 
     try {
-      const result =
-        await this.evaluationService.evaluateMultipleCauses(request);
+      const jobResponse =
+        await this.evaluationQueueService.addMultiCauseJob(request);
 
       this.logger.log(
-        `Multi-cause evaluation completed. ${result.successfulCauses}/${result.totalCauses} causes succeeded. ` +
-          `Total projects: ${result.totalProjects}, with stored posts: ${result.totalProjectsWithStoredPosts}. ` +
-          `Duration: ${result.evaluationDuration}ms`,
+        `Multi-cause evaluation job queued with job ID ${jobResponse.jobId}. ` +
+          `Estimated duration: ${jobResponse.estimatedDuration}`,
       );
 
-      return result;
+      return jobResponse;
     } catch (error) {
-      this.logger.error(`Failed to evaluate multiple causes:`, error);
+      this.logger.error(`Failed to queue multi-cause evaluation:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Gets the status and results of an evaluation job by ID.
+   *
+   * @param jobId - The evaluation job ID to check
+   * @returns JobStatusDto - Current status, progress, and results if completed
+   */
+  @Get('jobs/:jobId')
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+  async getJobStatus(@Param('jobId') jobId: string): Promise<JobStatusDto> {
+    this.logger.log(`Received job status request for job ID: ${jobId}`);
+
+    try {
+      const jobStatus = await this.evaluationQueueService.getJobStatus(jobId);
+
+      this.logger.log(
+        `Job status retrieved for ${jobId}: ${jobStatus.status}${
+          jobStatus.progress !== undefined
+            ? ` (${jobStatus.progress}% complete)`
+            : ''
+        }`,
+      );
+
+      return jobStatus;
+    } catch (error) {
+      this.logger.error(`Failed to get job status for ${jobId}:`, error);
       throw error;
     }
   }

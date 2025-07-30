@@ -42,7 +42,7 @@ export class JobSchedulerService {
       // These are NOT regular scheduled jobs - they're temporary distributed locks
       const expiredLocks = await this.scheduledJobRepository
         .createQueryBuilder('job')
-        .where("job.jobType::text LIKE 'LOCK_%'")
+        .where("job.job_type::text LIKE 'LOCK_%'")
         .andWhere('job.scheduledFor < :now', { now })
         .getMany();
 
@@ -72,7 +72,7 @@ export class JobSchedulerService {
       const deleteResult = await this.scheduledJobRepository
         .createQueryBuilder()
         .delete()
-        .where("jobType::text LIKE 'LOCK_%'")
+        .where("job_type::text LIKE 'LOCK_%'")
         .andWhere('scheduledFor < :now', { now })
         .execute();
 
@@ -409,14 +409,14 @@ export class JobSchedulerService {
       // Get all active locks (NOT regular scheduled jobs)
       const activeLocks = await this.scheduledJobRepository
         .createQueryBuilder('job')
-        .where("job.jobType::text LIKE 'LOCK_%'")
+        .where("job.job_type::text LIKE 'LOCK_%'")
         .andWhere('job.scheduledFor >= :now', { now })
         .getMany();
 
       // Get expired locks (NOT regular scheduled jobs)
       const expiredLocks = await this.scheduledJobRepository
         .createQueryBuilder('job')
-        .where("job.jobType::text LIKE 'LOCK_%'")
+        .where("job.job_type::text LIKE 'LOCK_%'")
         .andWhere('job.scheduledFor < :now', { now })
         .getMany();
 
@@ -464,7 +464,7 @@ export class JobSchedulerService {
       // Safety check: ensure we only delete lock jobs, not regular scheduled jobs
       const locksToDelete = await this.scheduledJobRepository
         .createQueryBuilder('job')
-        .where("job.jobType::text LIKE 'LOCK_%'")
+        .where("job.job_type::text LIKE 'LOCK_%'")
         .andWhere('job.scheduledFor < :now', { now })
         .getMany();
 
@@ -481,7 +481,7 @@ export class JobSchedulerService {
       const deleteResult = await this.scheduledJobRepository
         .createQueryBuilder()
         .delete()
-        .where("jobType::text LIKE 'LOCK_%'")
+        .where("job_type::text LIKE 'LOCK_%'")
         .andWhere('scheduledFor < :now', { now })
         .execute();
 

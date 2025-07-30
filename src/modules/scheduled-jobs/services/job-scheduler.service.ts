@@ -164,7 +164,7 @@ export class JobSchedulerService {
       // Log details for monitoring
       stuckJobs.forEach(job => {
         this.logger.debug(
-          `Reset stuck job ${job.id} (${job.jobType}) - was processing since ${job.processedAt}`,
+          `Reset stuck job ${job.id} (${job.jobType}) - was processing since ${job.processedAt?.toISOString() ?? 'unknown'}`,
         );
       });
     } catch (error) {

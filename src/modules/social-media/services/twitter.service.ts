@@ -272,8 +272,47 @@ export class TwitterService {
         `📋 Normalized ${normalizedCookies.length} cookies for authentication`,
       );
 
-      // Set cookies using the normalized format
-      await this.scraper.setCookies(normalizedCookies);
+      // Debug: Log the first cookie to see its structure
+      if (normalizedCookies.length > 0) {
+        this.logger.debug(
+          `🔍 First cookie structure: ${JSON.stringify(normalizedCookies[0], null, 2)}`,
+        );
+      }
+
+      // Try different cookie formats based on the library's expectations
+      try {
+        // First attempt: normalized cookie objects
+        await this.scraper.setCookies(normalizedCookies);
+        this.logger.debug('✅ Cookie objects format succeeded');
+      } catch (objectError) {
+        this.logger.debug(`❌ Cookie objects failed: ${objectError.message}`);
+
+        try {
+          // Second attempt: convert to cookie strings
+          const cookieStrings = normalizedCookies.map(cookie => {
+            const parts = [`${cookie.name}=${cookie.value}`];
+            if (cookie.domain) parts.push(`Domain=${cookie.domain}`);
+            if (cookie.path) parts.push(`Path=${cookie.path}`);
+            if (cookie.expires) parts.push(`Expires=${cookie.expires}`);
+            if (cookie.httpOnly) parts.push('HttpOnly');
+            if (cookie.secure) parts.push('Secure');
+            return parts.join('; ');
+          });
+
+          this.logger.debug(
+            `🔄 Trying cookie strings format (${cookieStrings.length} cookies)`,
+          );
+          await this.scraper.setCookies(cookieStrings);
+          this.logger.debug('✅ Cookie strings format succeeded');
+        } catch (stringError) {
+          this.logger.debug(`❌ Cookie strings failed: ${stringError.message}`);
+
+          // Third attempt: try the original raw cookie data
+          this.logger.debug('🔄 Trying original raw cookie format');
+          await this.scraper.setCookies(cookiesData);
+          this.logger.debug('✅ Raw cookie format succeeded');
+        }
+      }
 
       // Verify authentication
       const isLoggedIn = await this.scraper.isLoggedIn();

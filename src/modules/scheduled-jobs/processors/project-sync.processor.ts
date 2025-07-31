@@ -324,13 +324,13 @@ export class ProjectSyncProcessor {
     projectsWithFarcaster: number;
   }> {
     try {
-      const projects =
-        await this.projectSocialAccountService.getProjectsForScheduling();
+      const counts =
+        await this.projectSocialAccountService.getProjectCountWithSocialMedia();
 
       return {
-        totalProjects: projects.length,
-        projectsWithX: projects.filter(p => p.xUrl).length,
-        projectsWithFarcaster: projects.filter(p => p.farcasterUrl).length,
+        totalProjects: counts.total,
+        projectsWithX: counts.x,
+        projectsWithFarcaster: counts.farcaster,
         // TODO: Add lastSyncTime from metadata if needed
       };
     } catch (error) {

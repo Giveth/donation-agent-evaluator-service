@@ -4,7 +4,6 @@ import { Scraper, Tweet } from '@the-convocation/twitter-scraper';
 import { SocialPostDto, SocialMediaPlatform } from '../dto/social-post.dto';
 import * as fs from 'fs';
 import * as path from 'path';
-import { Cookie } from 'tough-cookie';
 
 /**
  * Interface for batch result containing handle and its results
@@ -234,87 +233,47 @@ export class TwitterService {
         );
       }
 
-      // Try setting cookies directly without conversion first
-      try {
-        await this.scraper.setCookies(cookiesData);
-        this.logger.log('📋 Set cookies directly from saved format');
+      // Normalize cookies to expected format
+      const normalizedCookies = cookiesData.map(cookie => {
+        // Handle both 'name'/'key' and 'value' fields
+        const normalized = {
+          ...cookie,
+          name: cookie.name ?? cookie.key,
+          value: cookie.value,
+        };
 
-        // Verify authentication
-        const isLoggedIn = await this.scraper.isLoggedIn();
-        if (isLoggedIn) {
-          this.logger.log('✅ Direct cookie authentication successful');
-          return true;
-        } else {
-          this.logger.debug(
-            '⚪ Direct cookie format failed, trying conversion...',
-          );
+        // Remove the 'key' field if it exists to avoid confusion
+        if (normalized.key && normalized.name) {
+          delete normalized.key;
         }
-      } catch (error) {
-        this.logger.debug(
-          `⚪ Direct cookie setting failed: ${error.message}, trying conversion...`,
-        );
-      }
 
-      // Convert plain objects to proper Cookie format expected by setCookies
-      // The setCookies method expects Cookie objects from the tough-cookie library
-      const formattedCookies = cookiesData
-        .map(cookie => {
-          try {
-            // Normalize cookie format - handle both 'name'/'key' and 'value' fields
-            const normalizedCookie = {
-              ...cookie,
-              name: cookie.name ?? cookie.key,
-              value: cookie.value,
-            };
-
-            // Remove the 'key' field if it exists to avoid confusion
-            if (normalizedCookie.key && normalizedCookie.name) {
-              delete normalizedCookie.key;
-            }
-
-            // Use tough-cookie's Cookie.fromJSON to create proper Cookie objects
-            const cookieObj = Cookie.fromJSON(normalizedCookie);
-
-            // Fix domain compatibility - convert all domains to x.com since that's what the scraper uses
-            if (cookieObj?.domain) {
-              // Convert all twitter.com domains to x.com domains
-              if (
-                cookieObj.domain === '.twitter.com' ||
-                cookieObj.domain === 'twitter.com'
-              ) {
-                cookieObj.domain = cookieObj.domain.replace(
-                  'twitter.com',
-                  'x.com',
-                );
-              }
-              // Ensure x.com domains are properly formatted
-              else if (cookieObj.domain === 'x.com') {
-                cookieObj.domain = '.x.com';
-              }
-            }
-
-            return cookieObj;
-          } catch (error) {
-            this.logger.warn(
-              `⚠️ Skipping malformed cookie: ${JSON.stringify(cookie)} - Error: ${error.message}`,
+        // Fix domain compatibility - convert all domains to x.com since that's what the scraper uses
+        if (normalized.domain) {
+          // Convert all twitter.com domains to x.com domains
+          if (
+            normalized.domain === '.twitter.com' ||
+            normalized.domain === 'twitter.com'
+          ) {
+            normalized.domain = normalized.domain.replace(
+              'twitter.com',
+              'x.com',
             );
-            return null;
           }
-        })
-        .flat() // Flatten the array since we might return arrays of cookies
-        .filter(cookie => cookie !== null);
+          // Ensure x.com domains are properly formatted
+          else if (normalized.domain === 'x.com') {
+            normalized.domain = '.x.com';
+          }
+        }
 
-      if (formattedCookies.length === 0) {
-        this.logger.warn('⚠️ No valid cookies found after formatting');
-        return false;
-      }
+        return normalized;
+      });
 
       this.logger.log(
-        `📋 Formatted ${formattedCookies.length} cookies for authentication`,
+        `📋 Normalized ${normalizedCookies.length} cookies for authentication`,
       );
-      // Removed verbose cookie logging for production
-      // Set cookies using the properly formatted Cookie objects
-      await this.scraper.setCookies(formattedCookies);
+
+      // Set cookies using the normalized format
+      await this.scraper.setCookies(normalizedCookies);
 
       // Verify authentication
       const isLoggedIn = await this.scraper.isLoggedIn();
@@ -720,18 +679,6 @@ export class TwitterService {
 
     // If it's just a username, clean it
     return this.cleanUsername(trimmed);
-  }
-
-  /**
-   * Cleans and normalizes Twitter handle input.
-   * Handles both usernames and full URLs.
-   * Kept for backward compatibility.
-   *
-   * @param handle - Raw Twitter handle or URL
-   * @returns Clean username without @ symbol
-   */
-  private cleanTwitterHandle(handle: string): string {
-    return this.extractUsernameFromTwitterUrl(handle);
   }
 
   /**

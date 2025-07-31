@@ -169,13 +169,22 @@ Be objective and consistent in your scoring. Consider professionalism, clarity, 
         post => post.platform === SocialMediaPlatform.FARCASTER,
       );
 
+      // Format category information for better LLM understanding
+      const categoryInfo =
+        input.causeCategories
+          ?.map(
+            cat =>
+              `- ${cat.category_name} (${cat.category_description}) - Main Category: ${cat.maincategory_title} (${cat.maincategory_description})`,
+          )
+          .join('\n') ?? 'No categories specified';
+
       const userPrompt = `Please evaluate the following project for a charitable cause:
 
 CAUSE INFORMATION:
 Title: ${input.causeTitle}
 Description: ${input.causeDescription}
-Category: ${input.causeMainCategory ?? 'General'}
-Subcategories: ${input.causeSubCategories?.join(', ') ?? 'None'}
+Categories:
+${categoryInfo}
 
 PROJECT INFORMATION:
 Title: ${input.projectTitle}
@@ -202,13 +211,13 @@ Please provide scores for:
 
 4. FARCASTER QUALITY (0-100): Evaluate the quality of Farcaster content specifically. Consider engagement, professionalism, and value provided. If no Farcaster activity, score 0.
 
-5. RELEVANCE TO CAUSE (0-100): Overall relevance score (combination of project data, Twitter, and Farcaster).
+5. RELEVANCE TO CAUSE (0-100): Overall relevance score (combination of project data(Project Description and LATEST UPDATE and Project Title), Twitter, and Farcaster) to the cause title, description, and all specified categories with their descriptions.
 
-6. TWITTER RELEVANCE (0-100): Evaluate how well Twitter posts align with the cause's mission and goals. If no Twitter activity, score 0.
+6. TWITTER RELEVANCE (0-100): Evaluate how well Twitter posts align with the cause's mission, goals, and specified categories. If no Twitter activity, score 0.
 
-7. FARCASTER RELEVANCE (0-100): Evaluate how well Farcaster posts align with the cause's mission and goals. If no Farcaster activity, score 0.
+7. FARCASTER RELEVANCE (0-100): Evaluate how well Farcaster posts align with the cause's mission, goals, and specified categories. If no Farcaster activity, score 0.
 
-8. PROJECT RELEVANCE (0-100): Evaluate how well the project information aligns with the cause's mission and goals based on project description and updates.
+8. PROJECT RELEVANCE (0-100): Evaluate how well the project information aligns with the cause's mission, goals, and specified categories based on project description and updates.
 
 9. EVIDENCE OF IMPACT (0-100): Evaluate evidence of social/environmental impact or philanthropic action demonstrated in project updates, Twitter posts, and Farcaster posts. Look for concrete examples of positive impact, beneficiaries helped, or meaningful change created.
 
@@ -332,24 +341,44 @@ Respond in JSON format:
   /**
    * Calculate GIVpower rank score (0-100)
    * Lower rank = higher score
+   * Returns 0 when totalProjectCount is null (indicating getTopPowerRank query failed)
    */
   private calculateGivPowerRankScore(
-    givPowerRank?: number,
-    totalProjectCount?: number,
+    _givPowerRank?: number,
+    _totalProjectCount?: number | null,
   ): number {
-    if (!givPowerRank) {
-      return 0;
-    }
+    // TODO: Re-enable GIVpower scoring when Impact Graph is fixed
+    // Currently returning 0 for all projects due to Impact Graph issues
+    return 0;
 
-    // If we don't know total project count, use a reasonable default
-    const totalProjects = totalProjectCount ?? 1000;
+    // Original implementation commented out until Impact Graph is fixed:
+    // // Return 0 if top power rank query failed (indicated by null totalProjectCount)
+    // if (totalProjectCount === null) {
+    //   this.logger.debug(
+    //     'GIVpower scoring disabled - totalProjectCount is null (getTopPowerRank query failed)',
+    //   );
+    //   return 0;
+    // }
 
-    // Normalize rank to percentile (lower rank is better)
-    // Top 10% get 90-100 score, bottom 10% get 0-10 score
-    const percentile = (totalProjects - givPowerRank) / totalProjects;
-    const score = percentile * 100;
+    // // Return 0 if project has no GIVpower rank
+    // if (!givPowerRank) {
+    //   return 0;
+    // }
 
-    return Math.round(Math.max(0, Math.min(100, score)));
+    // // Return 0 if totalProjectCount is not available (shouldn't happen with new implementation)
+    // if (!totalProjectCount) {
+    //   this.logger.warn(
+    //     'GIVpower scoring disabled - totalProjectCount is undefined',
+    //   );
+    //   return 0;
+    // }
+
+    // // Normalize rank to percentile (lower rank is better)
+    // // Top 10% get 90-100 score, bottom 10% get 0-10 score
+    // const percentile = (totalProjectCount - givPowerRank) / totalProjectCount;
+    // const score = percentile * 100;
+
+    // return Math.round(Math.max(0, Math.min(100, score)));
   }
 
   /**

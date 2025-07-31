@@ -4,7 +4,6 @@ import { Scraper, Tweet } from '@the-convocation/twitter-scraper';
 import { SocialPostDto, SocialMediaPlatform } from '../dto/social-post.dto';
 import * as fs from 'fs';
 import * as path from 'path';
-import { Cookie } from 'tough-cookie';
 
 /**
  * Interface for batch result containing handle and its results
@@ -64,12 +63,29 @@ export class TwitterService {
   private readonly baseRetryDelay: number;
   private lastRequestTime: number = 0;
 
+  // Twitter account credentials
+  private readonly account1: {
+    username: string | undefined;
+    password: string | undefined;
+    email: string | undefined;
+  };
+  private readonly account2: {
+    username: string | undefined;
+    password: string | undefined;
+    email: string | undefined;
+  };
+  private currentAccountNumber: 1 | 2 = 1;
+
   constructor(private readonly configService: ConfigService) {
     // Initialize the scraper
     this.scraper = new Scraper();
 
     // Set up cookies file path
-    this.cookiesFilePath = path.join(process.cwd(), 'twitter_cookies.json');
+    this.cookiesFilePath = path.join(
+      process.cwd(),
+      'cookies',
+      'twitter_cookies.json',
+    );
 
     // Rate limiting configuration - conservative values to avoid detection
     this.minDelayBetweenRequests =
@@ -81,8 +97,23 @@ export class TwitterService {
     this.baseRetryDelay =
       this.configService.get<number>('TWITTER_BASE_RETRY_DELAY_MS') ?? 5000; // 5 seconds
 
+    // Initialize Twitter account credentials
+    this.account1 = {
+      username: this.configService.get<string>('TWITTER_USERNAME'),
+      password: this.configService.get<string>('TWITTER_PASSWORD'),
+      email: this.configService.get<string>('TWITTER_EMAIL'),
+    };
+    this.account2 = {
+      username: this.configService.get<string>('TWITTER_USERNAME_2'),
+      password: this.configService.get<string>('TWITTER_PASSWORD_2'),
+      email: this.configService.get<string>('TWITTER_EMAIL_2'),
+    };
+
     this.logger.log(
       `TwitterService initialized with rate limiting: ${this.minDelayBetweenRequests}-${this.maxDelayBetweenRequests}ms delays, ${this.maxRetries} retries`,
+    );
+    this.logger.log(
+      `Available Twitter accounts: Account1=${this.hasValidCredentials(this.account1) ? '✓' : '❌'}, Account2=${this.hasValidCredentials(this.account2) ? '✓' : '❌'}`,
     );
 
     // Initialize authentication
@@ -202,87 +233,47 @@ export class TwitterService {
         );
       }
 
-      // Try setting cookies directly without conversion first
-      try {
-        await this.scraper.setCookies(cookiesData);
-        this.logger.log('📋 Set cookies directly from saved format');
+      // Normalize cookies to expected format
+      const normalizedCookies = cookiesData.map(cookie => {
+        // Handle both 'name'/'key' and 'value' fields
+        const normalized = {
+          ...cookie,
+          name: cookie.name ?? cookie.key,
+          value: cookie.value,
+        };
 
-        // Verify authentication
-        const isLoggedIn = await this.scraper.isLoggedIn();
-        if (isLoggedIn) {
-          this.logger.log('✅ Direct cookie authentication successful');
-          return true;
-        } else {
-          this.logger.debug(
-            '⚪ Direct cookie format failed, trying conversion...',
-          );
+        // Remove the 'key' field if it exists to avoid confusion
+        if (normalized.key && normalized.name) {
+          delete normalized.key;
         }
-      } catch (error) {
-        this.logger.debug(
-          `⚪ Direct cookie setting failed: ${error.message}, trying conversion...`,
-        );
-      }
 
-      // Convert plain objects to proper Cookie format expected by setCookies
-      // The setCookies method expects Cookie objects from the tough-cookie library
-      const formattedCookies = cookiesData
-        .map(cookie => {
-          try {
-            // Normalize cookie format - handle both 'name'/'key' and 'value' fields
-            const normalizedCookie = {
-              ...cookie,
-              name: cookie.name ?? cookie.key,
-              value: cookie.value,
-            };
-
-            // Remove the 'key' field if it exists to avoid confusion
-            if (normalizedCookie.key && normalizedCookie.name) {
-              delete normalizedCookie.key;
-            }
-
-            // Use tough-cookie's Cookie.fromJSON to create proper Cookie objects
-            const cookieObj = Cookie.fromJSON(normalizedCookie);
-
-            // Fix domain compatibility - convert all domains to x.com since that's what the scraper uses
-            if (cookieObj?.domain) {
-              // Convert all twitter.com domains to x.com domains
-              if (
-                cookieObj.domain === '.twitter.com' ||
-                cookieObj.domain === 'twitter.com'
-              ) {
-                cookieObj.domain = cookieObj.domain.replace(
-                  'twitter.com',
-                  'x.com',
-                );
-              }
-              // Ensure x.com domains are properly formatted
-              else if (cookieObj.domain === 'x.com') {
-                cookieObj.domain = '.x.com';
-              }
-            }
-
-            return cookieObj;
-          } catch (error) {
-            this.logger.warn(
-              `⚠️ Skipping malformed cookie: ${JSON.stringify(cookie)} - Error: ${error.message}`,
+        // Fix domain compatibility - convert all domains to x.com since that's what the scraper uses
+        if (normalized.domain) {
+          // Convert all twitter.com domains to x.com domains
+          if (
+            normalized.domain === '.twitter.com' ||
+            normalized.domain === 'twitter.com'
+          ) {
+            normalized.domain = normalized.domain.replace(
+              'twitter.com',
+              'x.com',
             );
-            return null;
           }
-        })
-        .flat() // Flatten the array since we might return arrays of cookies
-        .filter(cookie => cookie !== null);
+          // Ensure x.com domains are properly formatted
+          else if (normalized.domain === 'x.com') {
+            normalized.domain = '.x.com';
+          }
+        }
 
-      if (formattedCookies.length === 0) {
-        this.logger.warn('⚠️ No valid cookies found after formatting');
-        return false;
-      }
+        return normalized;
+      });
 
       this.logger.log(
-        `📋 Formatted ${formattedCookies.length} cookies for authentication`,
+        `📋 Normalized ${normalizedCookies.length} cookies for authentication`,
       );
-      // Removed verbose cookie logging for production
-      // Set cookies using the properly formatted Cookie objects
-      await this.scraper.setCookies(formattedCookies);
+
+      // Set cookies using the normalized format
+      await this.scraper.setCookies(normalizedCookies);
 
       // Verify authentication
       const isLoggedIn = await this.scraper.isLoggedIn();
@@ -303,34 +294,152 @@ export class TwitterService {
   }
 
   /**
+   * Checks if an account has valid credentials.
+   */
+  private hasValidCredentials(account: {
+    username: string | undefined;
+    password: string | undefined;
+    email: string | undefined;
+  }): boolean {
+    return !!(account.username && account.password && account.email);
+  }
+
+  /**
+   * Randomly selects a Twitter account for authentication.
+   * Returns 1 or 2 based on random selection.
+   */
+  private selectRandomAccount(): 1 | 2 {
+    const availableAccounts: Array<1 | 2> = [];
+
+    if (this.hasValidCredentials(this.account1)) {
+      availableAccounts.push(1);
+    }
+    if (this.hasValidCredentials(this.account2)) {
+      availableAccounts.push(2);
+    }
+
+    if (availableAccounts.length === 0) {
+      this.logger.warn('⚠️ No valid Twitter accounts available');
+      return 1; // Default to account 1
+    }
+
+    // Random selection from available accounts
+    const selectedAccount =
+      availableAccounts[Math.floor(Math.random() * availableAccounts.length)];
+    this.logger.log(
+      `🎲 Randomly selected Twitter account ${selectedAccount} for authentication`,
+    );
+    return selectedAccount;
+  }
+
+  /**
+   * Gets the alternative account number for fallback.
+   */
+  private getAlternativeAccount(currentAccount: 1 | 2): 1 | 2 {
+    return currentAccount === 1 ? 2 : 1;
+  }
+
+  /**
+   * Gets account credentials by account number.
+   */
+  private getAccountCredentials(accountNumber: 1 | 2): {
+    username: string | undefined;
+    password: string | undefined;
+    email: string | undefined;
+  } {
+    return accountNumber === 1 ? this.account1 : this.account2;
+  }
+
+  /**
    * Attempts authentication using username/password credentials.
+   * Uses random account selection with automatic fallback.
    */
   private async authenticateWithPassword(): Promise<boolean> {
-    try {
-      const username = this.configService.get<string>('TWITTER_USERNAME');
-      const password = this.configService.get<string>('TWITTER_PASSWORD');
-      const email = this.configService.get<string>('TWITTER_EMAIL');
-      // Username logging removed for security
-      if (!username || !password || !email) {
+    // Check if we have any valid accounts before attempting authentication
+    const hasAccount1 = this.hasValidCredentials(this.account1);
+    const hasAccount2 = this.hasValidCredentials(this.account2);
+
+    if (!hasAccount1 && !hasAccount2) {
+      this.logger.warn(
+        '⚠️ No valid Twitter account credentials available for password authentication',
+      );
+      return false;
+    }
+
+    // First, randomly select an account to try
+    this.currentAccountNumber = this.selectRandomAccount();
+
+    // Try the randomly selected account first
+    let success = await this.tryAuthenticateWithAccount(
+      this.currentAccountNumber,
+    );
+
+    if (!success) {
+      // If first account failed, try the alternative account
+      const alternativeAccount = this.getAlternativeAccount(
+        this.currentAccountNumber,
+      );
+      if (
+        this.hasValidCredentials(this.getAccountCredentials(alternativeAccount))
+      ) {
+        this.logger.log(
+          `⚡ Falling back to Twitter account ${alternativeAccount}...`,
+        );
+        this.currentAccountNumber = alternativeAccount;
+        success = await this.tryAuthenticateWithAccount(alternativeAccount);
+      } else {
         this.logger.warn(
-          '⚠️ Twitter credentials not provided. Please set TWITTER_USERNAME, TWITTER_PASSWORD, and TWITTER_EMAIL environment variables.',
+          `⚠️ Alternative Twitter account ${alternativeAccount} has invalid credentials, cannot fallback`,
+        );
+      }
+    }
+
+    if (success) {
+      // Save cookies after successful login
+      const cookies = await this.scraper.getCookies();
+      this.saveCookiesToFile(cookies);
+      this.logger.log(
+        `💾 Saved authentication cookies for future use (Account ${this.currentAccountNumber})`,
+      );
+    }
+
+    return success;
+  }
+
+  /**
+   * Attempts authentication with a specific account number.
+   */
+  private async tryAuthenticateWithAccount(
+    accountNumber: 1 | 2,
+  ): Promise<boolean> {
+    try {
+      const account = this.getAccountCredentials(accountNumber);
+
+      if (!this.hasValidCredentials(account)) {
+        this.logger.warn(
+          `⚠️ Twitter account ${accountNumber} credentials not provided or incomplete.`,
         );
         return false;
       }
 
-      this.logger.log('🔐 Attempting password authentication...');
+      this.logger.log(
+        `🔐 Attempting password authentication with account ${accountNumber}...`,
+      );
 
-      await this.scraper.login(username, password, email);
+      await this.scraper.login(
+        account.username!,
+        account.password!,
+        account.email,
+      );
 
-      // Save cookies after successful login
-      const cookies = await this.scraper.getCookies();
-      // Removed verbose cookie logging for production
-      this.saveCookiesToFile(cookies);
-      this.logger.log('💾 Saved authentication cookies for future use');
-
+      this.logger.log(
+        `✅ Password authentication successful with account ${accountNumber}`,
+      );
       return true;
     } catch (error) {
-      this.logger.error(`❌ Password authentication failed: ${error.message}`);
+      this.logger.error(
+        `❌ Password authentication failed with account ${accountNumber}: ${error.message}`,
+      );
       return false;
     }
   }
@@ -475,8 +584,29 @@ export class TwitterService {
       if (count >= 15) break; // Safety limit
     }
 
+    // Filter out pure retweets but keep quote tweets and originals
+    const filteredTweets = tweets.filter(tweet => {
+      // Keep original tweets (not retweets)
+      if (!tweet.isRetweet) return true;
+
+      // Keep quote tweets (retweets with user commentary)
+      if (tweet.isQuoted) return true;
+
+      // Filter out pure retweets (RT without commentary)
+      return false;
+    });
+
+    const retweetsFiltered = tweets.length - filteredTweets.length;
+    if (retweetsFiltered > 0) {
+      this.logger.log(
+        `${cleanHandle} - Filtered out ${retweetsFiltered} pure retweets, keeping ${filteredTweets.length} original/quote tweets`,
+      );
+    }
+
     // Map to SocialPostDto
-    const socialPosts = tweets.map(tweet => this.mapTweetToSocialPost(tweet));
+    const socialPosts = filteredTweets.map(tweet =>
+      this.mapTweetToSocialPost(tweet),
+    );
 
     this.logger.log(
       `Successfully fetched ${socialPosts.length} tweets for ${cleanHandle}`,
@@ -549,18 +679,6 @@ export class TwitterService {
 
     // If it's just a username, clean it
     return this.cleanUsername(trimmed);
-  }
-
-  /**
-   * Cleans and normalizes Twitter handle input.
-   * Handles both usernames and full URLs.
-   * Kept for backward compatibility.
-   *
-   * @param handle - Raw Twitter handle or URL
-   * @returns Clean username without @ symbol
-   */
-  private cleanTwitterHandle(handle: string): string {
-    return this.extractUsernameFromTwitterUrl(handle);
   }
 
   /**
@@ -867,19 +985,19 @@ export class TwitterService {
   async getAuthStatus(): Promise<{
     isAuthenticated: boolean;
     isLoggedIn: boolean;
-    credentialsProvided: boolean;
+    account1CredentialsProvided: boolean;
+    account2CredentialsProvided: boolean;
+    currentAccountNumber: 1 | 2;
     cookiesFileExists: boolean;
   }> {
     await this.ensureAuthenticated();
 
-    const username = this.configService.get<string>('TWITTER_USERNAME');
-    const password = this.configService.get<string>('TWITTER_PASSWORD');
-    const email = this.configService.get<string>('TWITTER_EMAIL');
-
     return {
       isAuthenticated: this.isAuthenticated,
       isLoggedIn: await this.isLoggedIn(),
-      credentialsProvided: !!(username && password && email),
+      account1CredentialsProvided: this.hasValidCredentials(this.account1),
+      account2CredentialsProvided: this.hasValidCredentials(this.account2),
+      currentAccountNumber: this.currentAccountNumber,
       cookiesFileExists: fs.existsSync(this.cookiesFilePath),
     };
   }
@@ -1003,8 +1121,29 @@ export class TwitterService {
         }
       }
 
+      // Filter out pure retweets but keep quote tweets and originals
+      const filteredTweets = tweets.filter(tweet => {
+        // Keep original tweets (not retweets)
+        if (!tweet.isRetweet) return true;
+
+        // Keep quote tweets (retweets with user commentary)
+        if (tweet.isQuoted) return true;
+
+        // Filter out pure retweets (RT without commentary)
+        return false;
+      });
+
+      const retweetsFiltered = tweets.length - filteredTweets.length;
+      if (retweetsFiltered > 0) {
+        this.logger.log(
+          `${username} - Incremental: Filtered out ${retweetsFiltered} pure retweets, keeping ${filteredTweets.length} original/quote tweets`,
+        );
+      }
+
       // Map to SocialPostDto
-      const socialPosts = tweets.map(tweet => this.mapTweetToSocialPost(tweet));
+      const socialPosts = filteredTweets.map(tweet =>
+        this.mapTweetToSocialPost(tweet),
+      );
 
       this.logger.log(
         `Incremental fetch for ${username} completed: ${socialPosts.length} new tweets found${

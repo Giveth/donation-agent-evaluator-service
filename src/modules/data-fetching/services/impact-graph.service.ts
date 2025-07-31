@@ -10,6 +10,8 @@ import {
   ALL_CAUSES_WITH_PROJECTS_QUERY,
   CAUSE_BY_ID_QUERY,
   ALL_PROJECTS_WITH_FILTERS_QUERY,
+  GET_TOP_POWER_RANK_QUERY,
+  BULK_UPDATE_CAUSE_PROJECT_EVALUATION_MUTATION,
 } from '../graphql/queries';
 import {
   ProjectDetailsDto,
@@ -21,6 +23,10 @@ import {
   createCauseDetailsDto,
   createCauseProjectSlugsDto,
 } from '../dto/cause-details.dto';
+import {
+  UpdateCauseProjectEvaluationDto,
+  BulkUpdateCauseProjectEvaluationResponse,
+} from '../dto/update-cause-project-evaluation.dto';
 
 /**
  * Type definitions for GraphQL responses
@@ -49,13 +55,21 @@ export class ImpactGraphService {
       'https://impact-graph.serve.giveth.io/graphql',
     );
 
-    // Initialize GraphQL client
+    // Initialize GraphQL client with timeout configuration
     this.graphqlClient = new GraphQLClient(this.baseUrl, {
       headers: {
         'Content-Type': 'application/json',
         'User-Agent': 'Donation-Evaluator-Service/1.0',
       },
+      fetch: (url: RequestInfo | URL, init?: RequestInit) => {
+        return fetch(url, {
+          ...init,
+          signal: AbortSignal.timeout(150000), // 150 seconds timeout
+        });
+      },
     });
+
+    this.logger.log(`Initialized GraphQL client with 150 second timeout`);
 
     this.logger.log(
       `Initialized ImpactGraphService with endpoint: ${this.baseUrl}`,
@@ -368,23 +382,20 @@ export class ImpactGraphService {
    * @param offset - Number of causes to skip (default: 0)
    * @param searchTerm - Optional search term to filter causes
    * @param chainId - Optional chain ID to filter causes
-   * @param sortBy - Optional field to sort by
-   * @param sortDirection - Optional sort direction (ASC/DESC)
    * @param listingStatus - Optional listing status filter
    * @returns Array of causes with complete project data for evaluation
    */
   async getCausesWithProjectsForEvaluation(
-    limit: number = 50,
+    limit: number = 2,
     offset: number = 0,
     searchTerm?: string,
     chainId?: number,
-    sortBy?: string,
-    sortDirection?: string,
     listingStatus?: string,
   ): Promise<{
     causes: Array<{ cause: CauseDetailsDto; projects: ProjectDetailsDto[] }>;
     totalProcessed: number;
   }> {
+    const startTime = Date.now();
     try {
       this.logger.debug(
         `Fetching causes with projects for evaluation (limit: ${limit}, offset: ${offset})`,
@@ -393,8 +404,6 @@ export class ImpactGraphService {
           offset,
           searchTerm,
           chainId,
-          sortBy,
-          sortDirection,
           listingStatus,
         },
       );
@@ -404,14 +413,19 @@ export class ImpactGraphService {
         offset,
         searchTerm,
         chainId,
-        sortBy,
-        sortDirection,
         listingStatus,
       };
 
       const response = await this.graphqlClient.request<{
         causes: GraphQLCauseData[] | null;
       }>(ALL_PROJECTS_WITH_FILTERS_QUERY, variables);
+
+      const responseTime = Date.now() - startTime;
+      this.logger.debug(`GraphQL request completed in ${responseTime}ms`, {
+        responseTime,
+        limit,
+        offset,
+      });
 
       if (!response.causes || response.causes.length === 0) {
         this.logger.warn('No causes found in filtered GraphQL response');
@@ -446,8 +460,13 @@ export class ImpactGraphService {
         return { cause, projects };
       });
 
+      const totalResponseTime = Date.now() - startTime;
       this.logger.log(
-        `Successfully fetched ${processedCauses.length} filtered causes with ${processedCauses.reduce((sum, c) => sum + c.projects.length, 0)} total projects`,
+        `Successfully fetched ${processedCauses.length} filtered causes with ${processedCauses.reduce((sum, c) => sum + c.projects.length, 0)} total projects in ${totalResponseTime}ms`,
+        {
+          totalResponseTime,
+          causesCount: processedCauses.length,
+        },
       );
 
       return {
@@ -455,6 +474,15 @@ export class ImpactGraphService {
         totalProcessed: processedCauses.length,
       };
     } catch (error) {
+      const responseTime = Date.now() - startTime;
+      this.logger.error(`GraphQL request failed after ${responseTime}ms`, {
+        responseTime,
+        limit,
+        offset,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+
       this.handleGraphQLError(
         error as GraphQLError,
         'getCausesWithProjectsForEvaluation',
@@ -478,7 +506,7 @@ export class ImpactGraphService {
       // Start with first batch
       const allSlugs = new Set<string>();
       let offset = 0;
-      const limit = 50; // Reasonable batch size
+      const limit = 5; // Reasonable batch size
       let hasMore = true;
 
       while (hasMore) {
@@ -515,6 +543,123 @@ export class ImpactGraphService {
       );
       throw new HttpException(
         'Failed to fetch project slugs from causes',
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    }
+  }
+
+  /**
+   * Bulk update cause project evaluation scores in Impact Graph
+   * Sends evaluation results back to Impact Graph after evaluation completion
+   * @param updates - Array of cause project evaluation updates
+   * @returns Array of updated cause project records
+   */
+  async bulkUpdateCauseProjectEvaluation(
+    updates: UpdateCauseProjectEvaluationDto[],
+  ): Promise<BulkUpdateCauseProjectEvaluationResponse[]> {
+    try {
+      if (updates.length === 0) {
+        this.logger.warn(
+          'No updates provided for bulk cause project evaluation',
+        );
+        return [];
+      }
+
+      this.logger.log(
+        `Sending bulk update for ${updates.length} cause project evaluations to Impact Graph`,
+        {
+          updates: updates.map(u => ({
+            causeId: u.causeId,
+            projectId: u.projectId,
+            causeScore: u.causeScore,
+          })),
+        },
+      );
+
+      const variables = {
+        updates: updates.map(update => ({
+          causeId: update.causeId,
+          projectId: update.projectId,
+          causeScore: update.causeScore,
+        })),
+      };
+
+      const response = await this.graphqlClient.request<{
+        bulkUpdateCauseProjectEvaluation: BulkUpdateCauseProjectEvaluationResponse[];
+      }>(BULK_UPDATE_CAUSE_PROJECT_EVALUATION_MUTATION, variables);
+
+      const updatedRecords = response.bulkUpdateCauseProjectEvaluation;
+
+      this.logger.log(
+        `Successfully updated ${updatedRecords.length} cause project evaluations in Impact Graph`,
+        {
+          updatedRecords: updatedRecords.map(record => ({
+            id: record.id,
+            causeId: record.causeId,
+            projectId: record.projectId,
+            causeScore: record.causeScore,
+          })),
+        },
+      );
+
+      return updatedRecords;
+    } catch (error) {
+      this.logger.error(
+        'Failed to bulk update cause project evaluations in Impact Graph',
+        {
+          error: error instanceof Error ? error.message : String(error),
+          updatesCount: updates.length,
+          updates: updates.map(u => ({
+            causeId: u.causeId,
+            projectId: u.projectId,
+            causeScore: u.causeScore,
+          })),
+        },
+      );
+
+      this.handleGraphQLError(
+        error as GraphQLError,
+        'bulkUpdateCauseProjectEvaluation',
+      );
+
+      // Re-throw the error to let the calling service handle it
+      throw new HttpException(
+        'Failed to update cause project evaluations in Impact Graph',
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    }
+  }
+
+  /**
+   * Get the top power rank value for GIVpower scoring normalization
+   * This replaces the need to use totalProjectCount as it provides the actual maximum rank
+   * @returns The top power rank value
+   * @throws HttpException when the query fails
+   */
+  async getTopPowerRank(): Promise<number> {
+    try {
+      this.logger.debug('Fetching top power rank from Impact-Graph');
+
+      const response = await this.graphqlClient.request<{
+        getTopPowerRank: number;
+      }>(GET_TOP_POWER_RANK_QUERY);
+
+      const topPowerRank = response.getTopPowerRank;
+
+      this.logger.debug(`Retrieved top power rank: ${topPowerRank}`);
+
+      return topPowerRank;
+    } catch (error) {
+      this.logger.error(
+        'Failed to fetch top power rank from Impact-Graph',
+        error as GraphQLError,
+      );
+
+      this.handleGraphQLError(error as GraphQLError, 'getTopPowerRank');
+
+      // Throw error instead of providing fallback - let calling service handle appropriately
+      throw new HttpException(
+        'Failed to fetch top power rank from Impact-Graph',
         HttpStatus.SERVICE_UNAVAILABLE,
       );
     }
@@ -572,16 +717,18 @@ export class ImpactGraphService {
    */
   private handleGraphQLError(error: GraphQLError, operation: string): void {
     if (error instanceof ClientError) {
-      // GraphQL-specific error handling
+      // GraphQL-specific error handling with enhanced logging
       this.logger.error(`GraphQL error in ${operation}:`, {
         message: error.message,
         query: error.request.query,
         variables: error.request.variables,
         errors: error.response.errors,
         status: error.response.status,
+        data: error.response.data,
+        extensions: error.response.extensions,
       });
 
-      // Log individual GraphQL errors
+      // Log individual GraphQL errors with more detail
       if (error.response.errors) {
         error.response.errors.forEach(
           (gqlError: BaseGraphQLError, index: number) => {
@@ -593,8 +740,13 @@ export class ImpactGraphService {
                 column: loc.column,
               })),
               extensions: gqlError.extensions,
+              source: gqlError.source?.body,
             });
           },
+        );
+      } else {
+        this.logger.error(
+          `No specific GraphQL errors found in response for ${operation}`,
         );
       }
     } else if (
@@ -606,19 +758,31 @@ export class ImpactGraphService {
         message: (error as { message: string }).message,
         code: (error as { code: string }).code,
         hostname: (error as { hostname?: string }).hostname,
+        errno: (error as { errno?: string }).errno,
+        syscall: (error as { syscall?: string }).syscall,
       });
     } else if ((error as { code?: string }).code === 'ETIMEDOUT') {
       // Timeout issues
       this.logger.error(`Timeout error in ${operation}:`, {
         message: (error as { message: string }).message,
         timeout: (error as { timeout?: number }).timeout,
+        code: (error as { code: string }).code,
+      });
+    } else if ((error as { name?: string }).name === 'AbortError') {
+      // Request was aborted (likely timeout)
+      this.logger.error(`Request aborted in ${operation}:`, {
+        message: (error as { message: string }).message,
+        name: (error as { name: string }).name,
+        cause: (error as { cause?: unknown }).cause,
       });
     } else {
-      // Generic error handling
+      // Generic error handling with more context
       this.logger.error(`Unexpected error in ${operation}:`, {
         message: (error as { message: string }).message,
         stack: (error as { stack?: string }).stack,
         name: (error as { name?: string }).name,
+        cause: (error as { cause?: unknown }).cause,
+        code: (error as { code?: string }).code,
       });
     }
   }

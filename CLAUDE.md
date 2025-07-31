@@ -46,17 +46,20 @@ npm run test:debug         # Debug tests
 The TwitterService uses `@the-convocation/twitter-scraper` with dual authentication:
 
 1. **Cookie-based authentication** (primary) - uses saved cookies from `twitter_cookies.json`
-2. **Password authentication** (fallback) - requires `TWITTER_USERNAME`, `TWITTER_PASSWORD`, `TWITTER_EMAIL`
+2. **Password authentication** (fallback) - supports dual accounts with random selection and automatic fallback:
+   - Account 1: `TWITTER_USERNAME`, `TWITTER_PASSWORD`, `TWITTER_EMAIL`
+   - Account 2: `TWITTER_USERNAME_2`, `TWITTER_PASSWORD_2`, `TWITTER_EMAIL_2`
+   - Randomly selects between accounts, with automatic fallback to the other account if the first fails
 
 ### Scoring Rubric (Total: 100%)
 
-- Project Information & Update Quality: 15% (LLM-assessed)
-- Update Recency: 10% (calculated)
+- Project Information & Update Quality: 10% (LLM-assessed)
+- Update Recency: 5% (calculated)
 - Social Media Content Quality: 10% (LLM-assessed, split: Twitter 50%, Farcaster 50%)
 - Social Media Posting Recency: 5% (calculated)
 - Social Media Posting Frequency: 5% (calculated)
-- Relevance to Cause: 20% (LLM-assessed, split: Twitter 33%, Farcaster 33%, Project 33%)
-- Evidence of Social/Environmental Impact: 20% (LLM-assessed)
+- Relevance to Cause: 25% (LLM-assessed, split: Twitter 33%, Farcaster 33%, Project 33%)
+- Evidence of Social/Environmental Impact: 25% (LLM-assessed)
 - GIVpower Rank: 15% (from Giveth DB)
 
 ## Environment Variables
@@ -72,10 +75,15 @@ CACHE_TTL_SOCIAL_MEDIA=21600  # 6 hours in seconds
 # Twitter Authentication (Method 1: Cookies)
 TWITTER_COOKIES='[{"name":"auth_token","value":"..."}]'
 
-# Twitter Authentication (Method 2: Credentials)
+# Twitter Authentication (Method 2: Credentials - Account 1)
 TWITTER_USERNAME=your_username
 TWITTER_PASSWORD=your_password
 TWITTER_EMAIL=your_email
+
+# Twitter Authentication (Method 2: Credentials - Account 2)
+TWITTER_USERNAME_2=your_username_2
+TWITTER_PASSWORD_2=your_password_2
+TWITTER_EMAIL_2=your_email_2
 
 # Twitter Rate Limiting
 TWITTER_MIN_DELAY_MS=3000
@@ -95,13 +103,13 @@ GIVETH_API_BASE_URL=https://api.giveth.io
 GIVETH_API_KEY=your_giveth_key
 
 # Scoring Weight Configuration (Optional - defaults are used if not specified)
-SCORING_WEIGHT_PROJECT_INFO_QUALITY=15
-SCORING_WEIGHT_UPDATE_RECENCY=10
+SCORING_WEIGHT_PROJECT_INFO_QUALITY=10
+SCORING_WEIGHT_UPDATE_RECENCY=5
 SCORING_WEIGHT_SOCIAL_MEDIA_QUALITY=10
 SCORING_WEIGHT_SOCIAL_MEDIA_RECENCY=5
 SCORING_WEIGHT_SOCIAL_MEDIA_FREQUENCY=5
-SCORING_WEIGHT_RELEVANCE_TO_CAUSE=20
-SCORING_WEIGHT_EVIDENCE_OF_IMPACT=20
+SCORING_WEIGHT_RELEVANCE_TO_CAUSE=25
+SCORING_WEIGHT_EVIDENCE_OF_IMPACT=25
 SCORING_WEIGHT_GIVPOWER_RANK=15
 
 ```

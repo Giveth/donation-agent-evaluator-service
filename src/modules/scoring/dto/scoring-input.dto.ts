@@ -74,10 +74,11 @@ export class ScoringInputDto {
 
   /**
    * Total number of projects in the system (for rank normalization)
+   * When null, GIVpower scoring will be disabled (score = 0)
    */
   @IsOptional()
   @IsNumber()
-  totalProjectCount?: number;
+  totalProjectCount?: number | null;
 
   /**
    * Cause title for relevance assessment
@@ -92,19 +93,16 @@ export class ScoringInputDto {
   causeDescription!: string;
 
   /**
-   * Main category of the cause
-   */
-  @IsOptional()
-  @IsString()
-  causeMainCategory?: string;
-
-  /**
-   * Sub-categories of the cause
+   * Complete category information for the cause
    */
   @IsOptional()
   @IsArray()
-  @IsString({ each: true })
-  causeSubCategories?: string[];
+  causeCategories?: Array<{
+    category_name: string;
+    category_description: string;
+    maincategory_title: string;
+    maincategory_description: string;
+  }>;
 
   constructor(data: Partial<ScoringInputDto>) {
     Object.assign(this, data);

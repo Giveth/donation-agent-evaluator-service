@@ -3,6 +3,7 @@ import { Cron } from '@nestjs/schedule';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, QueryRunner } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
+import pLimit from 'p-limit';
 import { ImpactGraphService } from '../../data-fetching/services/impact-graph.service';
 import { ProjectSocialAccountService } from '../../social-media-storage/services/project-social-account.service';
 import { ScheduledJob } from '../../social-media-storage/entities/scheduled-job.entity';
@@ -58,7 +59,8 @@ export class ProjectSyncProcessor {
   /**
    * Scheduled cron job that runs every 6 hours to sync project data
    */
-  @Cron('0 */6 * * *', {
+  // @Cron('0 */6 * * *', {
+  @Cron('0 * * * *', {
     name: 'project-sync-scheduled',
     timeZone: 'UTC',
   })
@@ -82,8 +84,6 @@ export class ProjectSyncProcessor {
     try {
       // Use the new filtered sync method with sorting for latest projects first
       await this.syncProjectsFromFilteredCauses({
-        sortBy: 'creationDate',
-        sortDirection: 'DESC',
         // No limit set - will fetch all projects in batches
       });
       this.logger.log(
@@ -119,8 +119,6 @@ export class ProjectSyncProcessor {
 
     try {
       const result = await this.syncProjectsFromFilteredCauses({
-        sortBy: 'creationDate',
-        sortDirection: 'DESC',
         // No limit set - will fetch all projects in batches
       });
 
@@ -174,183 +172,21 @@ export class ProjectSyncProcessor {
 
   /**
    * Main synchronization method that fetches all projects from all causes
-   * and updates the local database with complete project metadata.
+   * and updates the local database with complete project metadata using batch processing.
+   * @deprecated Use syncProjectsFromFilteredCauses() instead for better performance and reliability
    */
   private async syncAllProjectsFromCauses(
     correlationId: string,
   ): Promise<SyncResult> {
-    const startTime = Date.now();
-    let totalProjectsProcessed = 0;
-    let totalCausesProcessed = 0;
-    let totalErrors = 0;
-    const projectsProcessed = new Set<string>();
+    this.logger.log(
+      'syncAllProjectsFromCauses is deprecated, delegating to batch processing method',
+      { correlationId },
+    );
 
-    // Use transaction for atomic operations
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    try {
-      this.logger.log(
-        'Starting comprehensive project synchronization from all causes',
-        { correlationId },
-      );
-
-      // Fetch all causes with projects in batches
-      let offset = 0;
-      const batchSize = 50; // Process causes in batches to manage memory
-      let hasMore = true;
-
-      while (hasMore) {
-        this.logger.debug(
-          `Fetching causes batch: offset=${offset}, limit=${batchSize}`,
-          { correlationId, offset, batchSize },
-        );
-
-        const { causes } = await this.retryOperation(
-          () =>
-            this.impactGraphService.getAllCausesWithProjects(batchSize, offset),
-          3,
-          correlationId,
-        );
-
-        if (causes.length === 0) {
-          hasMore = false;
-          break;
-        }
-
-        // Process each cause and its projects
-        for (const { cause, projects } of causes) {
-          try {
-            this.logger.debug(
-              `Processing cause "${cause.title}" (ID: ${cause.id}) with ${projects.length} projects`,
-              {
-                correlationId,
-                causeId: cause.id,
-                projectCount: projects.length,
-              },
-            );
-
-            // Process each project in the cause
-            for (const project of projects) {
-              try {
-                // Skip if we've already processed this project (deduplicate across causes)
-                if (projectsProcessed.has(project.id.toString())) {
-                  this.logger.debug(
-                    `Skipping duplicate project: ${project.title} (ID: ${project.id})`,
-                    { correlationId, projectId: project.id },
-                  );
-                  continue;
-                }
-
-                await this.syncSingleProject(
-                  project,
-                  queryRunner,
-                  correlationId,
-                );
-                projectsProcessed.add(project.id.toString());
-                totalProjectsProcessed++;
-
-                // Add small delay to avoid overwhelming the database
-                if (totalProjectsProcessed % 10 === 0) {
-                  await new Promise(resolve => setTimeout(resolve, 100));
-                }
-              } catch (error) {
-                totalErrors++;
-                this.logger.warn(
-                  `Failed to sync project: ${project.title} (ID: ${project.id})`,
-                  {
-                    error:
-                      error instanceof Error ? error.message : String(error),
-                    stack: error instanceof Error ? error.stack : undefined,
-                    correlationId,
-                    projectId: project.id,
-                  },
-                );
-                // Continue with other projects
-              }
-            }
-
-            totalCausesProcessed++;
-          } catch (error) {
-            totalErrors++;
-            this.logger.warn(
-              `Failed to process cause: ${cause.title} (ID: ${cause.id})`,
-              {
-                error: error instanceof Error ? error.message : String(error),
-                stack: error instanceof Error ? error.stack : undefined,
-                correlationId,
-                causeId: cause.id,
-              },
-            );
-            // Continue with other causes
-          }
-        }
-
-        // Move to next batch
-        offset += batchSize;
-        hasMore = causes.length === batchSize;
-
-        // Log progress
-        this.logger.log(
-          `Batch completed. Processed ${totalCausesProcessed} causes, ` +
-            `${totalProjectsProcessed} unique projects so far...`,
-          {
-            correlationId,
-            causesProcessed: totalCausesProcessed,
-            projectsProcessed: totalProjectsProcessed,
-            errors: totalErrors,
-          },
-        );
-      }
-
-      // Commit transaction
-      await queryRunner.commitTransaction();
-
-      const processingTime = Date.now() - startTime;
-      this.logger.log(
-        `Project synchronization completed successfully. ` +
-          `Total: ${totalCausesProcessed} causes, ${totalProjectsProcessed} unique projects, ` +
-          `${totalErrors} errors, processing time: ${processingTime}ms`,
-        {
-          correlationId,
-          causesProcessed: totalCausesProcessed,
-          projectsProcessed: totalProjectsProcessed,
-          errors: totalErrors,
-          processingTimeMs: processingTime,
-        },
-      );
-
-      return {
-        success: true,
-        projectsProcessed: totalProjectsProcessed,
-        causesProcessed: totalCausesProcessed,
-        processingTimeMs: processingTime,
-        errors: totalErrors,
-        correlationId,
-      };
-    } catch (error) {
-      // Rollback transaction on error
-      await queryRunner.rollbackTransaction();
-
-      const processingTime = Date.now() - startTime;
-      this.logger.error(
-        `Project synchronization failed after processing ${totalProjectsProcessed} projects ` +
-          `in ${processingTime}ms`,
-        {
-          error: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-          correlationId,
-          projectsProcessed: totalProjectsProcessed,
-          causesProcessed: totalCausesProcessed,
-          errors: totalErrors,
-        },
-      );
-      throw error;
-    } finally {
-      // Release query runner
-      await queryRunner.release();
-    }
+    // Delegate to the new batch processing method with no filters
+    return await this.syncProjectsFromFilteredCauses({
+      // No filters - will fetch all causes and projects
+    });
   }
 
   /**
@@ -403,8 +239,6 @@ export class ProjectSyncProcessor {
           categories: project.categories?.map(cat => cat.name) ?? [],
           mainCategory: project.mainCategory,
           subCategories: project.subCategories ?? [],
-          giveBacks: project.giveBacks,
-          isGivbackEligible: project.isGivbackEligible,
           creationDate: project.creationDate,
           updatedAt: project.updatedAt,
           latestUpdateCreationDate: project.latestUpdateCreationDate,
@@ -455,8 +289,6 @@ export class ProjectSyncProcessor {
 
     try {
       const result = await this.syncProjectsFromFilteredCauses({
-        sortBy: 'creationDate',
-        sortDirection: 'DESC',
         // No limit set - will fetch all projects in batches
       });
       this.logger.log(
@@ -492,13 +324,13 @@ export class ProjectSyncProcessor {
     projectsWithFarcaster: number;
   }> {
     try {
-      const projects =
-        await this.projectSocialAccountService.getProjectsForScheduling();
+      const counts =
+        await this.projectSocialAccountService.getProjectCountWithSocialMedia();
 
       return {
-        totalProjects: projects.length,
-        projectsWithX: projects.filter(p => p.xUrl).length,
-        projectsWithFarcaster: projects.filter(p => p.farcasterUrl).length,
+        totalProjects: counts.total,
+        projectsWithX: counts.x,
+        projectsWithFarcaster: counts.farcaster,
         // TODO: Add lastSyncTime from metadata if needed
       };
     } catch (error) {
@@ -515,8 +347,9 @@ export class ProjectSyncProcessor {
   }
 
   /**
-   * Synchronize projects from filtered causes using the ALL_PROJECTS_WITH_FILTERS_QUERY
-   * This method fetches causes with filtering options and saves only the projects to local database
+   * Synchronize projects from filtered causes using batch transaction processing
+   * This method fetches causes with filtering options and saves projects in batches
+   * to prevent long-running transactions and query runner issues
    * @param filterOptions - Optional filter parameters for causes
    * @returns Sync result with statistics
    */
@@ -526,8 +359,6 @@ export class ProjectSyncProcessor {
       offset?: number;
       searchTerm?: string;
       chainId?: number;
-      sortBy?: string;
-      sortDirection?: string;
       listingStatus?: string;
     } = {},
   ): Promise<SyncResult> {
@@ -538,37 +369,48 @@ export class ProjectSyncProcessor {
     let totalErrors = 0;
     const projectsProcessed = new Set<string>();
 
-    this.logger.log('Starting project synchronization from filtered causes', {
+    // Configuration for batch processing
+    const PROJECT_BATCH_SIZE = 15; // Process projects in smaller batches
+    const MAX_CONSECUTIVE_FAILURES = 5; // Circuit breaker threshold
+    const CONCURRENCY_LIMIT = 3; // Maximum concurrent batch operations
+    let consecutiveFailures = 0;
+
+    // Create concurrency limiter for batch processing
+    const limit = pLimit(CONCURRENCY_LIMIT);
+
+    this.logger.log('Starting project synchronization with batch processing', {
       correlationId,
       filterOptions,
+      batchSize: PROJECT_BATCH_SIZE,
+      concurrencyLimit: CONCURRENCY_LIMIT,
     });
 
-    // Use transaction for atomic operations
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
     try {
+      // Collect all projects first
+      const allProjects: Array<{
+        project: any;
+        causeId: string;
+        causeTitle: string;
+      }> = [];
+
       // Fetch causes with projects in batches using filters
       let offset = filterOptions.offset ?? 0;
-      const batchSize = filterOptions.limit ?? 50;
+      const fetchBatchSize = filterOptions.limit ?? 2;
       let hasMore = true;
 
       while (hasMore) {
         this.logger.debug(
-          `Fetching filtered causes batch: offset=${offset}, limit=${batchSize}`,
-          { correlationId, offset, batchSize, filterOptions },
+          `Fetching filtered causes batch: offset=${offset}, limit=${fetchBatchSize}`,
+          { correlationId, offset, batchSize: fetchBatchSize, filterOptions },
         );
 
         const { causes } = await this.retryOperation(
           () =>
             this.impactGraphService.getCausesWithProjectsForEvaluation(
-              batchSize,
+              fetchBatchSize,
               offset,
               filterOptions.searchTerm,
               filterOptions.chainId,
-              filterOptions.sortBy,
-              filterOptions.sortDirection,
               filterOptions.listingStatus,
             ),
           3,
@@ -580,117 +422,167 @@ export class ProjectSyncProcessor {
           break;
         }
 
-        // Process each cause and its projects
+        // Collect unique projects from each cause
         for (const { cause, projects } of causes) {
-          try {
-            this.logger.debug(
-              `Processing cause "${cause.title}" (ID: ${cause.id}) with ${projects.length} projects`,
-              {
-                correlationId,
-                causeId: cause.id,
-                projectCount: projects.length,
+          totalCausesProcessed++;
+
+          for (const project of projects) {
+            // Skip duplicates across causes
+            if (!projectsProcessed.has(project.id.toString())) {
+              allProjects.push({
+                project,
+                causeId: cause.id.toString(),
                 causeTitle: cause.title,
-              },
-            );
-
-            // Process each project in the cause
-            for (const project of projects) {
-              try {
-                // Skip if we've already processed this project (deduplicate across causes)
-                if (projectsProcessed.has(project.id.toString())) {
-                  this.logger.debug(
-                    `Skipping duplicate project: ${project.title} (ID: ${project.id})`,
-                    { correlationId, projectId: project.id },
-                  );
-                  continue;
-                }
-
-                await this.syncSingleProject(
-                  project,
-                  queryRunner,
-                  correlationId,
-                );
-                projectsProcessed.add(project.id.toString());
-                totalProjectsProcessed++;
-
-                // Add small delay to avoid overwhelming the database
-                if (totalProjectsProcessed % 10 === 0) {
-                  await new Promise(resolve => setTimeout(resolve, 100));
-                }
-              } catch (error) {
-                totalErrors++;
-                this.logger.warn(
-                  `Failed to sync project: ${project.title} (ID: ${project.id})`,
-                  {
-                    error:
-                      error instanceof Error ? error.message : String(error),
-                    stack: error instanceof Error ? error.stack : undefined,
-                    correlationId,
-                    projectId: project.id,
-                  },
-                );
-                // Continue with other projects
-              }
+              });
+              projectsProcessed.add(project.id.toString());
             }
-
-            totalCausesProcessed++;
-          } catch (error) {
-            totalErrors++;
-            this.logger.warn(
-              `Failed to process cause: ${cause.title} (ID: ${cause.id})`,
-              {
-                error: error instanceof Error ? error.message : String(error),
-                stack: error instanceof Error ? error.stack : undefined,
-                correlationId,
-                causeId: cause.id,
-              },
-            );
-            // Continue with other causes
           }
         }
 
-        // Move to next batch (only if we're not using a specific limit)
-        if (!filterOptions.limit) {
-          offset += batchSize;
-          hasMore = causes.length === batchSize;
-        } else {
-          hasMore = false; // If specific limit was provided, don't continue
-        }
+        // Move to next batch - continue pagination until no more data
+        offset += fetchBatchSize;
+        hasMore = causes.length === fetchBatchSize;
+      }
 
-        // Log progress
+      this.logger.log(
+        `Collected ${allProjects.length} unique projects from ${totalCausesProcessed} causes. Starting batch processing...`,
+        {
+          correlationId,
+          totalProjects: allProjects.length,
+          causesProcessed: totalCausesProcessed,
+        },
+      );
+
+      // Create batch processing tasks with concurrency control
+      const batches: Array<
+        Array<{ project: any; causeId: string; causeTitle: string }>
+      > = [];
+      for (let i = 0; i < allProjects.length; i += PROJECT_BATCH_SIZE) {
+        batches.push(allProjects.slice(i, i + PROJECT_BATCH_SIZE));
+      }
+
+      const totalBatches = batches.length;
+      this.logger.log(
+        `Processing ${totalBatches} batches with concurrency limit of ${CONCURRENCY_LIMIT}`,
+        { correlationId, totalBatches, concurrencyLimit: CONCURRENCY_LIMIT },
+      );
+
+      // Process batches with concurrency control using p-limit
+      const batchPromises = batches.map((batch, index) =>
+        limit(async () => {
+          // Circuit breaker: Check before processing each batch
+          if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+            this.logger.warn(
+              `Skipping batch ${index + 1} due to circuit breaker (${consecutiveFailures}/${MAX_CONSECUTIVE_FAILURES} failures)`,
+              { correlationId, batchNumber: index + 1 },
+            );
+            return { success: false, processed: 0, errors: batch.length };
+          }
+
+          const batchNumber = index + 1;
+          this.logger.debug(
+            `Processing batch ${batchNumber}/${totalBatches} with ${batch.length} projects (concurrency-controlled)`,
+            {
+              correlationId,
+              batchNumber,
+              totalBatches,
+              batchSize: batch.length,
+            },
+          );
+
+          const batchResult = await this.processSingleBatch(
+            batch,
+            correlationId,
+            batchNumber,
+          );
+
+          // Handle consecutive failures tracking
+          if (batchResult.success) {
+            consecutiveFailures = Math.max(0, consecutiveFailures - 1); // Gradually recover
+          } else {
+            consecutiveFailures++;
+            this.logger.warn(
+              `Batch ${batchNumber} failed (consecutive failures: ${consecutiveFailures}/${MAX_CONSECUTIVE_FAILURES})`,
+              { correlationId, batchNumber, errors: batchResult.errors },
+            );
+          }
+
+          // Log progress for significant batches
+          if (batchNumber % 10 === 0) {
+            this.logger.log(
+              `Batch ${batchNumber}/${totalBatches} completed with ${batchResult.processed}/${batch.length} projects processed`,
+              {
+                correlationId,
+                batchNumber,
+                totalBatches,
+                processed: batchResult.processed,
+                errors: batchResult.errors,
+              },
+            );
+          }
+
+          return batchResult;
+        }),
+      );
+
+      // Wait for all batches to complete with proper error handling
+      const batchResults = await Promise.allSettled(batchPromises);
+
+      // Aggregate results from all batches
+      for (const result of batchResults) {
+        if (result.status === 'fulfilled') {
+          totalProjectsProcessed += result.value.processed;
+          totalErrors += result.value.errors;
+        } else {
+          // Handle promise rejection (should be rare with our error handling)
+          totalErrors++;
+          this.logger.error('Batch processing promise rejected', {
+            error:
+              result.reason instanceof Error
+                ? result.reason.message
+                : String(result.reason),
+            correlationId,
+          });
+        }
+      }
+
+      const processingTime = Date.now() - startTime;
+      const success = consecutiveFailures < MAX_CONSECUTIVE_FAILURES;
+
+      if (success) {
         this.logger.log(
-          `Filtered batch completed. Processed ${totalCausesProcessed} causes, ` +
-            `${totalProjectsProcessed} unique projects so far...`,
+          `Batch project synchronization completed successfully. ` +
+            `Total: ${totalCausesProcessed} causes, ${totalProjectsProcessed} unique projects, ` +
+            `${totalErrors} errors, processing time: ${processingTime}ms`,
           {
             correlationId,
             causesProcessed: totalCausesProcessed,
             projectsProcessed: totalProjectsProcessed,
             errors: totalErrors,
+            processingTimeMs: processingTime,
+            filterOptions,
+          },
+        );
+      } else {
+        this.logger.error(
+          `Batch project synchronization terminated due to consecutive failures. ` +
+            `Processed ${totalProjectsProcessed}/${allProjects.length} projects, ` +
+            `${totalErrors} errors, processing time: ${processingTime}ms`,
+          {
+            correlationId,
+            causesProcessed: totalCausesProcessed,
+            projectsProcessed: totalProjectsProcessed,
+            totalProjects: allProjects.length,
+            errors: totalErrors,
+            processingTimeMs: processingTime,
+            consecutiveFailures,
             filterOptions,
           },
         );
       }
 
-      // Commit transaction
-      await queryRunner.commitTransaction();
-
-      const processingTime = Date.now() - startTime;
-      this.logger.log(
-        `Filtered project synchronization completed successfully. ` +
-          `Total: ${totalCausesProcessed} causes, ${totalProjectsProcessed} unique projects, ` +
-          `${totalErrors} errors, processing time: ${processingTime}ms`,
-        {
-          correlationId,
-          causesProcessed: totalCausesProcessed,
-          projectsProcessed: totalProjectsProcessed,
-          errors: totalErrors,
-          processingTimeMs: processingTime,
-          filterOptions,
-        },
-      );
-
       return {
-        success: true,
+        success,
         projectsProcessed: totalProjectsProcessed,
         causesProcessed: totalCausesProcessed,
         processingTimeMs: processingTime,
@@ -698,12 +590,9 @@ export class ProjectSyncProcessor {
         correlationId,
       };
     } catch (error) {
-      // Rollback transaction on error
-      await queryRunner.rollbackTransaction();
-
       const processingTime = Date.now() - startTime;
       this.logger.error(
-        `Filtered project synchronization failed after processing ${totalProjectsProcessed} projects ` +
+        `Batch project synchronization failed after processing ${totalProjectsProcessed} projects ` +
           `in ${processingTime}ms`,
         {
           error: error instanceof Error ? error.message : String(error),
@@ -716,10 +605,219 @@ export class ProjectSyncProcessor {
         },
       );
       throw error;
-    } finally {
-      // Release query runner
-      await queryRunner.release();
     }
+  }
+
+  /**
+   * Process a single batch of projects with its own transaction
+   * This method provides transaction isolation and health monitoring
+   * @param batch - Array of projects to process
+   * @param correlationId - Correlation ID for tracking
+   * @param batchNumber - Batch number for logging
+   * @returns Batch processing result
+   */
+  private async processSingleBatch(
+    batch: Array<{ project: any; causeId: string; causeTitle: string }>,
+    correlationId: string,
+    batchNumber: number,
+  ): Promise<{ success: boolean; processed: number; errors: number }> {
+    let queryRunner: QueryRunner | null = null;
+    let processed = 0;
+    let errors = 0;
+
+    try {
+      // Create and validate query runner
+      queryRunner = await this.createHealthyQueryRunner(correlationId);
+
+      const batchStartTime = Date.now();
+      this.logger.debug(
+        `Starting batch ${batchNumber} transaction with ${batch.length} projects`,
+        { correlationId, batchNumber, batchSize: batch.length },
+      );
+
+      await queryRunner.startTransaction();
+
+      // Process projects within the batch sequentially (safer for transactions)
+      // This eliminates race conditions and simplifies error handling
+      for (const { project, causeId, causeTitle } of batch) {
+        try {
+          await this.syncSingleProject(project, queryRunner, correlationId);
+          processed++;
+
+          this.logger.debug(
+            `Successfully synced project ${project.title} (ID: ${project.id}) in batch ${batchNumber}`,
+            {
+              correlationId,
+              batchNumber,
+              projectId: project.id,
+              processed,
+              remaining: batch.length - processed,
+            },
+          );
+        } catch (error) {
+          errors++;
+          this.logger.warn(
+            `Failed to sync project ${project.title} (ID: ${project.id}) in batch ${batchNumber}`,
+            {
+              error: error instanceof Error ? error.message : String(error),
+              stack: error instanceof Error ? error.stack : undefined,
+              correlationId,
+              batchNumber,
+              projectId: project.id,
+              causeId,
+              causeTitle,
+            },
+          );
+          // Continue processing other projects in the batch
+        }
+      }
+
+      // Commit the batch transaction
+      await queryRunner.commitTransaction();
+
+      const batchTime = Date.now() - batchStartTime;
+      const success = errors < batch.length; // Success if at least one project was processed
+
+      if (success) {
+        this.logger.debug(
+          `Batch ${batchNumber} completed successfully: ${processed}/${batch.length} projects, ${errors} errors, ${batchTime}ms`,
+          {
+            correlationId,
+            batchNumber,
+            processed,
+            total: batch.length,
+            errors,
+            processingTimeMs: batchTime,
+          },
+        );
+      } else {
+        this.logger.error(
+          `Batch ${batchNumber} failed completely: 0/${batch.length} projects processed, ${errors} errors, ${batchTime}ms`,
+          {
+            correlationId,
+            batchNumber,
+            processed: 0,
+            total: batch.length,
+            errors,
+            processingTimeMs: batchTime,
+          },
+        );
+      }
+
+      return { success, processed, errors };
+    } catch (error) {
+      // Rollback transaction on batch-level errors
+      if (queryRunner) {
+        try {
+          await queryRunner.rollbackTransaction();
+          this.logger.debug(
+            `Rolled back batch ${batchNumber} transaction due to error`,
+            { correlationId, batchNumber, processed, errors },
+          );
+        } catch (rollbackError) {
+          this.logger.error(
+            `Failed to rollback batch ${batchNumber} transaction`,
+            {
+              error:
+                rollbackError instanceof Error
+                  ? rollbackError.message
+                  : String(rollbackError),
+              originalError:
+                error instanceof Error ? error.message : String(error),
+              correlationId,
+              batchNumber,
+            },
+          );
+        }
+      }
+
+      this.logger.error(`Batch ${batchNumber} transaction failed completely`, {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        correlationId,
+        batchNumber,
+        processed,
+        total: batch.length,
+      });
+
+      return { success: false, processed, errors: batch.length };
+    } finally {
+      // Always release the query runner
+      if (queryRunner) {
+        try {
+          await queryRunner.release();
+          this.logger.debug(`Released query runner for batch ${batchNumber}`, {
+            correlationId,
+            batchNumber,
+          });
+        } catch (releaseError) {
+          this.logger.error(
+            `Failed to release query runner for batch ${batchNumber}`,
+            {
+              error:
+                releaseError instanceof Error
+                  ? releaseError.message
+                  : String(releaseError),
+              correlationId,
+              batchNumber,
+            },
+          );
+        }
+      }
+    }
+  }
+
+  /**
+   * Create a healthy query runner with proper validation
+   * @param correlationId - Correlation ID for tracking
+   * @returns Promise<QueryRunner> - A validated query runner
+   */
+  private async createHealthyQueryRunner(
+    correlationId: string,
+  ): Promise<QueryRunner> {
+    let attempts = 0;
+    const maxAttempts = 3;
+
+    while (attempts < maxAttempts) {
+      attempts++;
+
+      try {
+        const queryRunner = this.dataSource.createQueryRunner();
+        await queryRunner.connect();
+
+        // Validate the connection is healthy
+        await queryRunner.query('SELECT 1 as health_check');
+
+        this.logger.debug(
+          `Created healthy query runner (attempt ${attempts}/${maxAttempts})`,
+          { correlationId, attempt: attempts },
+        );
+
+        return queryRunner;
+      } catch (error) {
+        this.logger.warn(
+          `Failed to create healthy query runner (attempt ${attempts}/${maxAttempts})`,
+          {
+            error: error instanceof Error ? error.message : String(error),
+            correlationId,
+            attempt: attempts,
+            maxAttempts,
+          },
+        );
+
+        if (attempts === maxAttempts) {
+          throw new Error(
+            `Failed to create healthy query runner after ${maxAttempts} attempts: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+
+        // Wait before retry with exponential backoff
+        const backoffMs = 1000 * Math.pow(2, attempts - 1);
+        await new Promise(resolve => setTimeout(resolve, backoffMs));
+      }
+    }
+
+    throw new Error('Unreachable code');
   }
 
   /**
@@ -835,8 +933,6 @@ export class ProjectSyncProcessor {
       offset?: number;
       searchTerm?: string;
       chainId?: number;
-      sortBy?: string;
-      sortDirection?: string;
       listingStatus?: string;
     } = {},
   ): Promise<{
@@ -863,8 +959,6 @@ export class ProjectSyncProcessor {
           filterOptions.offset ?? 0,
           filterOptions.searchTerm,
           filterOptions.chainId,
-          filterOptions.sortBy,
-          filterOptions.sortDirection,
           filterOptions.listingStatus,
         );
 

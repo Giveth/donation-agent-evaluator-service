@@ -39,62 +39,6 @@ export class ProjectStatusDto {
 }
 
 /**
- * DTO for project admin user information
- */
-export class ProjectAdminDto {
-  @IsNumber()
-  id!: number;
-
-  @IsOptional()
-  @IsString()
-  firstName?: string;
-
-  @IsOptional()
-  @IsString()
-  lastName?: string;
-
-  @IsOptional()
-  @IsString()
-  name?: string;
-
-  @IsOptional()
-  @IsString()
-  walletAddress?: string;
-
-  @IsOptional()
-  @IsString()
-  avatar?: string;
-
-  @IsOptional()
-  @IsString()
-  url?: string;
-
-  @IsOptional()
-  @IsString()
-  location?: string;
-
-  constructor(data: {
-    id: number;
-    firstName?: string;
-    lastName?: string;
-    name?: string;
-    walletAddress?: string;
-    avatar?: string;
-    url?: string;
-    location?: string;
-  }) {
-    this.id = data.id;
-    this.firstName = data.firstName;
-    this.lastName = data.lastName;
-    this.name = data.name;
-    this.walletAddress = data.walletAddress;
-    this.avatar = data.avatar;
-    this.url = data.url;
-    this.location = data.location;
-  }
-}
-
-/**
  * DTO for project social media URLs matching Impact Graph structure
  */
 export class ProjectSocialMediaDto {
@@ -512,13 +456,6 @@ export class ProjectDetailsDto {
   latestUpdateCreationDate?: Date;
 
   /**
-   * Project admin user information
-   */
-  @IsOptional()
-  @Type(() => ProjectAdminDto)
-  adminUser?: ProjectAdminDto;
-
-  /**
    * Project power ranking information
    */
   @IsOptional()
@@ -612,7 +549,6 @@ export class ProjectDetailsDto {
     creationDate?: Date | string;
     updatedAt?: Date | string;
     latestUpdateCreationDate?: Date | string;
-    adminUser?: ProjectAdminDto;
     projectPower?: ProjectPowerDto;
     projectInstantPower?: ProjectPowerDto;
     projectFuturePower?: ProjectPowerDto;
@@ -663,7 +599,6 @@ export class ProjectDetailsDto {
       typeof data.latestUpdateCreationDate === 'string'
         ? new Date(data.latestUpdateCreationDate)
         : data.latestUpdateCreationDate;
-    this.adminUser = data.adminUser;
     this.projectPower = data.projectPower;
     this.projectInstantPower = data.projectInstantPower;
     this.projectFuturePower = data.projectFuturePower;
@@ -788,7 +723,6 @@ export function createProjectDetailsDto(project: unknown): ProjectDetailsDto {
     creationDate: proj.creationDate,
     updatedAt: proj.updatedAt,
     latestUpdateCreationDate: proj.latestUpdateCreationDate,
-    adminUser: proj.adminUser ? new ProjectAdminDto(proj.adminUser) : undefined,
     projectPower: proj.projectPower
       ? new ProjectPowerDto(proj.projectPower)
       : undefined,

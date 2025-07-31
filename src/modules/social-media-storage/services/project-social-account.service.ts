@@ -26,8 +26,8 @@ export interface ProjectAccountData {
   farcasterUrl?: string;
   lastXFetch?: Date;
   lastFarcasterFetch?: Date;
-  latestXPostTimestamp?: Date;
-  latestFarcasterPostTimestamp?: Date;
+  latestXPostTimestamp?: Date | null;
+  latestFarcasterPostTimestamp?: Date | null;
   metadata?: Record<string, unknown>;
 }
 
@@ -79,6 +79,9 @@ export class ProjectSocialAccountService {
     queryRunner: QueryRunner,
   ): Promise<ProjectSocialAccount> {
     try {
+      // Validate query runner before use
+      this.validateQueryRunner(queryRunner, projectId);
+
       const repository =
         queryRunner.manager.getRepository(ProjectSocialAccount);
 
@@ -106,10 +109,33 @@ export class ProjectSocialAccountService {
 
       return projectAccount;
     } catch (error) {
+      // Enhanced error handling with more context
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const isQueryRunnerError =
+        errorMessage.includes('Query runner') ||
+        errorMessage.includes('released') ||
+        errorMessage.includes('transaction');
+
       this.logger.error(
         `Failed to upsert project account for project ${projectId} (transaction):`,
-        error,
+        {
+          error: errorMessage,
+          stack: error instanceof Error ? error.stack : undefined,
+          projectId,
+          isQueryRunnerError,
+          queryRunnerState: this.getQueryRunnerState(queryRunner),
+        },
       );
+
+      // Wrap query runner errors with more context
+      if (isQueryRunnerError) {
+        throw new Error(
+          `Database transaction error for project ${projectId}: ${errorMessage}. ` +
+            `Query runner state: ${JSON.stringify(this.getQueryRunnerState(queryRunner))}`,
+        );
+      }
+
       throw error;
     }
   }
@@ -504,5 +530,48 @@ export class ProjectSocialAccountService {
       latestFarcasterPostTimestamp: data.latestFarcasterPostTimestamp,
       metadata: data.metadata,
     };
+  }
+
+  /**
+   * Validate query runner state before attempting database operations
+   * @param queryRunner - The query runner to validate
+   * @param projectId - Project ID for context in error messages
+   */
+  private validateQueryRunner(
+    queryRunner: QueryRunner,
+    projectId: string,
+  ): void {
+    if (queryRunner.isReleased) {
+      throw new Error(
+        `Query runner is already released for project ${projectId}. Cannot execute database operations.`,
+      );
+    }
+
+    if (!queryRunner.isTransactionActive) {
+      throw new Error(
+        `Query runner transaction is not active for project ${projectId}. Cannot execute transactional operations.`,
+      );
+    }
+  }
+
+  /**
+   * Get query runner state information for debugging
+   * @param queryRunner - The query runner to inspect
+   * @returns Object with query runner state information
+   */
+  private getQueryRunnerState(queryRunner: QueryRunner): object {
+    try {
+      return {
+        isReleased: queryRunner.isReleased,
+        isTransactionActive: queryRunner.isTransactionActive,
+        hasConnection: !!queryRunner.connection,
+        databaseType: queryRunner.connection.options.type,
+      };
+    } catch (error) {
+      return {
+        status: 'error_getting_state',
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
   }
 }

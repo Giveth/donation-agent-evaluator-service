@@ -86,14 +86,14 @@ export class ProjectSocialAccount {
     type: 'timestamp',
     nullable: true,
   })
-  latestXPostTimestamp?: Date;
+  latestXPostTimestamp?: Date | null;
 
   @Column({
     name: 'latest_farcaster_post_timestamp',
     type: 'timestamp',
     nullable: true,
   })
-  latestFarcasterPostTimestamp?: Date;
+  latestFarcasterPostTimestamp?: Date | null;
 
   @Column({ name: 'metadata', type: 'jsonb', nullable: true })
   metadata?: Record<string, unknown>;

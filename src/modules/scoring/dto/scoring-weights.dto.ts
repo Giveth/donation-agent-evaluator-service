@@ -7,21 +7,21 @@ import { IsNumber, Min, Max } from 'class-validator';
 export class ScoringWeightsDto {
   /**
    * Weight for project information and update quality (LLM-assessed)
-   * Default: 0.15 (15%)
-   */
-  @IsNumber()
-  @Min(0)
-  @Max(1)
-  projectInfoQualityWeight: number = 0.15;
-
-  /**
-   * Weight for update recency score
    * Default: 0.10 (10%)
    */
   @IsNumber()
   @Min(0)
   @Max(1)
-  updateRecencyWeight: number = 0.1;
+  projectInfoQualityWeight: number = 0.1;
+
+  /**
+   * Weight for update recency score
+   * Default: 0.05 (5%)
+   */
+  @IsNumber()
+  @Min(0)
+  @Max(1)
+  updateRecencyWeight: number = 0.05;
 
   /**
    * Weight for social media content quality (LLM-assessed)
@@ -52,21 +52,21 @@ export class ScoringWeightsDto {
 
   /**
    * Weight for relevance to cause (LLM-assessed)
-   * Default: 0.20 (20%)
+   * Default: 0.25 (25%)
    */
   @IsNumber()
   @Min(0)
   @Max(1)
-  relevanceToCauseWeight: number = 0.2;
+  relevanceToCauseWeight: number = 0.25;
 
   /**
    * Weight for evidence of social/environmental impact (LLM-assessed)
-   * Default: 0.20 (20%)
+   * Default: 0.25 (25%)
    */
   @IsNumber()
   @Min(0)
   @Max(1)
-  evidenceOfImpactWeight: number = 0.2;
+  evidenceOfImpactWeight: number = 0.25;
 
   /**
    * Weight for GIVpower rank
@@ -133,25 +133,25 @@ export class ScoringWeightsDto {
   }): ScoringWeightsDto {
     // Convert percentages to decimal weights
     const weights = {
-      projectInfoQualityWeight: (percentages.projectInfoQuality ?? 15) / 100,
-      updateRecencyWeight: (percentages.updateRecency ?? 10) / 100,
+      projectInfoQualityWeight: (percentages.projectInfoQuality ?? 10) / 100,
+      updateRecencyWeight: (percentages.updateRecency ?? 5) / 100,
       socialMediaQualityWeight: (percentages.socialMediaQuality ?? 10) / 100,
       socialMediaRecencyWeight: (percentages.socialMediaRecency ?? 5) / 100,
       socialMediaFrequencyWeight: (percentages.socialMediaFrequency ?? 5) / 100,
-      relevanceToCauseWeight: (percentages.relevanceToCause ?? 20) / 100,
-      evidenceOfImpactWeight: (percentages.evidenceOfImpact ?? 20) / 100,
+      relevanceToCauseWeight: (percentages.relevanceToCause ?? 25) / 100,
+      evidenceOfImpactWeight: (percentages.evidenceOfImpact ?? 25) / 100,
       givPowerRankWeight: (percentages.givPowerRank ?? 15) / 100,
     };
 
     // Calculate actual sum including defaults for missing values
     let actualSum = 0;
-    actualSum += percentages.projectInfoQuality ?? 15;
-    actualSum += percentages.updateRecency ?? 10;
+    actualSum += percentages.projectInfoQuality ?? 10;
+    actualSum += percentages.updateRecency ?? 5;
     actualSum += percentages.socialMediaQuality ?? 10;
     actualSum += percentages.socialMediaRecency ?? 5;
     actualSum += percentages.socialMediaFrequency ?? 5;
-    actualSum += percentages.relevanceToCause ?? 20;
-    actualSum += percentages.evidenceOfImpact ?? 20;
+    actualSum += percentages.relevanceToCause ?? 25;
+    actualSum += percentages.evidenceOfImpact ?? 25;
     actualSum += percentages.givPowerRank ?? 15;
 
     if (Math.abs(actualSum - 100) > 0.1) {

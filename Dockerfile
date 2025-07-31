@@ -39,6 +39,9 @@ COPY docker-entrypoint.sh .
 # Make entrypoint executable
 RUN chmod +x docker-entrypoint.sh
 
+# Create cookies directory for persistent storage
+RUN mkdir -p cookies
+
 # Expose the application port
 EXPOSE 3333
 

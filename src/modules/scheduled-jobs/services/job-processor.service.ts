@@ -255,7 +255,7 @@ export class JobProcessorService {
       const jobs = await this.scheduledJobRepository
         .createQueryBuilder('job')
         .where('job.status = :status', { status: JobStatus.PENDING })
-        .andWhere('job.scheduledFor <= NOW()')
+        .andWhere('job.scheduledFor <= :now', { now: new Date() })
         .orderBy('job.scheduledFor', 'ASC')
         .limit(this.batchSize)
         .getMany();

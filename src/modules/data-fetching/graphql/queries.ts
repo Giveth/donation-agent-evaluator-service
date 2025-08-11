@@ -433,14 +433,6 @@ export const ALL_PROJECTS_WITH_FILTERS_QUERY = gql`
       title
       description
       projectType
-      totalRaised
-      totalDistributed
-      totalDonated
-      activeProjectsCount
-      chainId
-      creationDate
-      updatedAt
-      latestUpdateCreationDate
 
       # All projects in this cause with essential data for evaluation
       projects {
@@ -479,22 +471,6 @@ export const ALL_PROJECTS_WITH_FILTERS_QUERY = gql`
         socialMedia {
           type
           link
-        }
-
-        # Social profiles from verification
-        socialProfiles {
-          socialNetwork
-          link
-        }
-
-        # Power ranking information for GIVpower rank scoring
-        projectPower {
-          powerRank
-        }
-
-        # Instant power ranking (fallback)
-        projectInstantPower {
-          powerRank
         }
       }
     }

@@ -408,13 +408,15 @@ export class ImpactGraphService {
         },
       );
 
-      const variables = {
+      const variables: any = {
         limit,
         offset,
-        searchTerm,
-        chainId,
-        listingStatus,
       };
+
+      // Only add filters if they have values
+      if (searchTerm) variables.searchTerm = searchTerm;
+      if (chainId) variables.chainId = chainId;
+      if (listingStatus) variables.listingStatus = listingStatus;
 
       const response = await this.graphqlClient.request<{
         causes: GraphQLCauseData[] | null;
@@ -428,7 +430,15 @@ export class ImpactGraphService {
       });
 
       if (!response.causes || response.causes.length === 0) {
-        this.logger.warn('No causes found in filtered GraphQL response');
+        if (offset === 0) {
+          this.logger.warn(
+            'No causes found in filtered GraphQL response on first page - this may indicate an issue',
+          );
+        } else {
+          this.logger.debug(
+            `No more causes found at offset ${offset} - reached end of data during pagination`,
+          );
+        }
         return { causes: [], totalProcessed: 0 };
       }
 

@@ -208,6 +208,7 @@ export class ProjectSyncProcessor {
       const sanitizedTotalDonations = this.sanitizeNumericValue(
         project.totalDonations,
         0,
+        // eslint-disable-next-line no-loss-of-precision
         99999999999999.99, // Safe max value for numeric(20,2) within JS precision limits
         'totalDonations',
         project.id,

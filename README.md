@@ -74,19 +74,21 @@ The Donation Agent Evaluator Service is a core component of Giveth's Causes feat
 Queues evaluation of projects within a single cause.
 
 **Headers Required:**
+
 - `Content-Type: application/json`
 
 **Request Body (required):**
+
 ```json
 {
   "cause": {
     "id": 123,
-    "title": "Environmental Conservation", 
+    "title": "Environmental Conservation",
     "description": "Projects focused on environmental protection",
     "categories": [
       {
         "category_name": "Climate Action",
-        "category_description": "Fighting climate change", 
+        "category_description": "Fighting climate change",
         "maincategory_title": "Environment",
         "maincategory_description": "Environmental initiatives"
       }
@@ -97,8 +99,9 @@ Queues evaluation of projects within a single cause.
 ```
 
 **Field Requirements:**
+
 - `cause.id` (number, required): Cause ID
-- `cause.title` (string, required): Cause title  
+- `cause.title` (string, required): Cause title
 - `cause.description` (string, required): Cause description
 - `cause.categories` (array, optional): Array of category objects
   - `category_name` (string, required): Category name
@@ -108,6 +111,7 @@ Queues evaluation of projects within a single cause.
 - `projectIds` (number[], required): Array of project IDs to evaluate
 
 **Response:**
+
 ```json
 {
   "jobId": "uuid-job-id",
@@ -116,6 +120,7 @@ Queues evaluation of projects within a single cause.
 ```
 
 **Sample cURL Request:**
+
 ```bash
 curl -X POST https://staging.eval.ads.giveth.io/evaluate/cause \
   -H "Content-Type: application/json" \
@@ -142,9 +147,11 @@ curl -X POST https://staging.eval.ads.giveth.io/evaluate/cause \
 Queues evaluation of multiple causes in batch.
 
 **Headers Required:**
+
 - `Content-Type: application/json`
 
 **Request Body (required):**
+
 ```json
 {
   "causes": [
@@ -156,7 +163,7 @@ Queues evaluation of multiple causes in batch.
         "categories": [
           {
             "category_name": "Climate Action",
-            "category_description": "Fighting climate change", 
+            "category_description": "Fighting climate change",
             "maincategory_title": "Environment",
             "maincategory_description": "Environmental initiatives"
           }
@@ -166,14 +173,14 @@ Queues evaluation of multiple causes in batch.
     },
     {
       "cause": {
-        "id": 124, 
+        "id": 124,
         "title": "Education Access",
         "description": "Improving access to quality education",
         "categories": [
           {
             "category_name": "Primary Education",
             "category_description": "Elementary education access",
-            "maincategory_title": "Education", 
+            "maincategory_title": "Education",
             "maincategory_description": "Educational development"
           }
         ]
@@ -185,15 +192,17 @@ Queues evaluation of multiple causes in batch.
 ```
 
 **Field Requirements:**
+
 - `causes` (array, required): Array of cause evaluation requests
 - Each cause object follows the same structure as single cause evaluation:
   - `cause.id` (number, required): Cause ID
-  - `cause.title` (string, required): Cause title  
+  - `cause.title` (string, required): Cause title
   - `cause.description` (string, required): Cause description
   - `cause.categories` (array, optional): Array of category objects with required fields
   - `projectIds` (number[], required): Array of project IDs to evaluate
 
 **Sample cURL Request:**
+
 ```bash
 curl -X POST https://staging.eval.ads.giveth.io/evaluate/causes \
   -H "Content-Type: application/json" \
@@ -232,9 +241,11 @@ curl -X POST https://staging.eval.ads.giveth.io/evaluate/causes \
 Gets the status and results of an evaluation job.
 
 **Path Parameters:**
+
 - `jobId` (string, required): The UUID of the evaluation job
 
 **Response:**
+
 ```json
 {
   "status": "completed",
@@ -249,7 +260,7 @@ Gets the status and results of an evaluation job.
     "projects": [
       {
         "projectId": 456,
-        "title": "Ocean Cleanup Initiative", 
+        "title": "Ocean Cleanup Initiative",
         "causeScore": 85.2,
         "scoreBreakdown": {
           "projectInfoQuality": 8.5,
@@ -268,12 +279,14 @@ Gets the status and results of an evaluation job.
 ```
 
 **Status Values:**
+
 - `pending`: Job is queued but not started
 - `processing`: Job is currently running
 - `completed`: Job finished successfully
 - `failed`: Job encountered an error
 
 **Sample cURL Request:**
+
 ```bash
 curl https://staging.eval.ads.giveth.io/evaluate/jobs/550e8400-e29b-41d4-a716-446655440000
 ```
@@ -283,9 +296,11 @@ curl https://staging.eval.ads.giveth.io/evaluate/jobs/550e8400-e29b-41d4-a716-44
 Returns detailed evaluation reports from CSV data.
 
 **Query Parameters:**
+
 - `causeIds` (optional): Comma-separated cause IDs to filter results (e.g., `?causeIds=123,124,125`)
 
 **Sample cURL Requests:**
+
 ```bash
 # Get all evaluation data
 curl https://staging.eval.ads.giveth.io/evaluate/evaluation-detailed
@@ -294,7 +309,6 @@ curl https://staging.eval.ads.giveth.io/evaluate/evaluation-detailed
 curl "https://staging.eval.ads.giveth.io/evaluate/evaluation-detailed?causeIds=123,124,125"
 ```
 
-
 ### Admin Operations Endpoints
 
 #### `POST /admin/sync-projects`
@@ -302,9 +316,11 @@ curl "https://staging.eval.ads.giveth.io/evaluate/evaluation-detailed?causeIds=1
 Manually trigger project synchronization from Giveth backend.
 
 **Headers Required:**
+
 - None (no request body needed)
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -321,6 +337,7 @@ Manually trigger project synchronization from Giveth backend.
 ```
 
 **Sample cURL Request:**
+
 ```bash
 curl -X POST https://staging.eval.ads.giveth.io/admin/sync-projects
 ```
@@ -330,9 +347,11 @@ curl -X POST https://staging.eval.ads.giveth.io/admin/sync-projects
 Force social media data fetch for a specific project.
 
 **Path Parameters:**
+
 - `projectId` (string, required): The project ID to fetch data for
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -356,6 +375,7 @@ Force social media data fetch for a specific project.
 ```
 
 **Sample cURL Request:**
+
 ```bash
 curl -X POST https://staging.eval.ads.giveth.io/admin/fetch/project-123
 ```
@@ -367,6 +387,7 @@ Get comprehensive system statistics.
 **Response:** Detailed system statistics including project counts, job statuses, and social media metrics.
 
 **Sample cURL Request:**
+
 ```bash
 curl https://staging.eval.ads.giveth.io/admin/stats
 ```
@@ -378,6 +399,7 @@ Validate cause-project filtering behavior.
 **Response:** Validation results comparing GraphQL data with stored database data.
 
 **Sample cURL Request:**
+
 ```bash
 curl https://staging.eval.ads.giveth.io/admin/cause-project-validation
 ```
@@ -387,11 +409,13 @@ curl https://staging.eval.ads.giveth.io/admin/cause-project-validation
 Retrieve stored social media posts for multiple projects.
 
 **Query Parameters (required):**
+
 - `projectIds` (string, required): Comma-separated project IDs (e.g., `project1,project2`)
 - `platform` (string, optional): Filter by platform (`twitter` or `farcaster`)
 - `limit` (number, optional): Posts per project (default: 10, max: 50)
 
 **Sample cURL Requests:**
+
 ```bash
 # Get posts for multiple projects
 curl "https://staging.eval.ads.giveth.io/admin/social-posts?projectIds=project1,project2,project3"
@@ -412,6 +436,7 @@ Basic service information.
 **Response:** Basic service status and information.
 
 **Sample cURL Request:**
+
 ```bash
 curl https://staging.eval.ads.giveth.io/
 ```
@@ -425,6 +450,7 @@ Download evaluation results as CSV file.
 **Live URL**: https://staging.eval.ads.giveth.io/download/
 
 **Sample cURL Request:**
+
 ```bash
 # Download CSV file
 curl -O https://staging.eval.ads.giveth.io/download
@@ -449,9 +475,7 @@ CREATE TABLE project_social_accounts (
   slug VARCHAR(255) NOT NULL,
   description TEXT,
   project_status VARCHAR(100) NOT NULL,
-  quality_score DECIMAL(5,2),
   giv_power_rank INTEGER,
-  total_donations DECIMAL(15,2) DEFAULT 0,
   last_update_date TIMESTAMP,
   last_update_content TEXT,
   last_update_title VARCHAR(500),
@@ -519,9 +543,7 @@ erDiagram
         string slug
         text description
         string projectStatus
-        decimal qualityScore
         int givPowerRank
-        decimal totalDonations
         timestamp lastUpdateDate
         text lastUpdateContent
         string xUrl

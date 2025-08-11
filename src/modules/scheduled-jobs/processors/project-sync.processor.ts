@@ -204,23 +204,7 @@ export class ProjectSyncProcessor {
       // Use social media handles that were already extracted during DTO creation
       const socialMediaHandles = project.socialMediaHandles ?? {};
 
-      // Validate and sanitize numeric fields to prevent overflow
-      const sanitizedTotalDonations = this.sanitizeNumericValue(
-        project.totalDonations,
-        0,
-        // eslint-disable-next-line no-loss-of-precision
-        99999999999999.99, // Safe max value for numeric(20,2) within JS precision limits
-        'totalDonations',
-        project.id,
-      );
-
-      const sanitizedQualityScore = this.sanitizeNumericValue(
-        project.qualityScore,
-        0,
-        99999999.99, // Max value for numeric(10,2)
-        'qualityScore',
-        project.id,
-      );
+      // No numeric validation needed for removed fields
 
       // Prepare project data for upsert with sanitized values
       const projectData = {
@@ -229,8 +213,7 @@ export class ProjectSyncProcessor {
         slug: project.slug,
         description: project.description,
 
-        // Quality and ranking information (sanitized)
-        qualityScore: sanitizedQualityScore,
+        // Ranking information
         givPowerRank: project.projectPower?.powerRank,
 
         // Project status and verification
@@ -239,9 +222,6 @@ export class ProjectSyncProcessor {
         // Update information
         lastUpdateDate: project.lastUpdateDate,
         lastUpdateContent: project.lastUpdateContent,
-
-        // Financial and engagement metrics (sanitized)
-        totalDonations: sanitizedTotalDonations,
 
         // Social media URLs
         xUrl: socialMediaHandles.X,
@@ -260,15 +240,6 @@ export class ProjectSyncProcessor {
           creationDate: project.creationDate,
           updatedAt: project.updatedAt,
           latestUpdateCreationDate: project.latestUpdateCreationDate,
-          // Store original values if they were sanitized
-          originalTotalDonations:
-            sanitizedTotalDonations !== project.totalDonations
-              ? project.totalDonations
-              : undefined,
-          originalQualityScore:
-            sanitizedQualityScore !== project.qualityScore
-              ? project.qualityScore
-              : undefined,
         },
       };
 
@@ -288,10 +259,6 @@ export class ProjectSyncProcessor {
           projectId: project.id,
           xUrl: socialMediaHandles.X,
           farcasterUrl: socialMediaHandles.FARCASTER,
-          sanitized: {
-            totalDonations: sanitizedTotalDonations !== project.totalDonations,
-            qualityScore: sanitizedQualityScore !== project.qualityScore,
-          },
         },
       );
     } catch (error) {
@@ -310,8 +277,6 @@ export class ProjectSyncProcessor {
           // Log the actual values that caused the issue
           projectData: isNumericOverflow
             ? {
-                totalDonations: project.totalDonations,
-                qualityScore: project.qualityScore,
                 givPowerRank: project.projectPower?.powerRank,
               }
             : undefined,
@@ -833,7 +798,6 @@ export class ProjectSyncProcessor {
             isTransactionAborted,
             isConnectionError,
             willRetry: shouldRetry,
-            totalDonations: project.totalDonations,
             processingTimeMs: projectTime,
             attempt,
           },
@@ -846,8 +810,6 @@ export class ProjectSyncProcessor {
             {
               projectId: project.id,
               projectTitle: project.title,
-              totalDonations: project.totalDonations,
-              qualityScore: project.qualityScore,
               givPowerRank: project.projectPower?.powerRank,
               correlationId,
               attempt,
@@ -1260,84 +1222,5 @@ export class ProjectSyncProcessor {
     }
 
     throw lastError;
-  }
-
-  /**
-   * Sanitize numeric values to prevent database overflow errors
-   * @param value - The value to sanitize
-   * @param minValue - Minimum allowed value
-   * @param maxValue - Maximum allowed value
-   * @param fieldName - Name of the field for logging
-   * @param projectId - Project ID for logging
-   * @returns Sanitized value within bounds
-   */
-  private sanitizeNumericValue(
-    value: number | undefined | null,
-    minValue: number,
-    maxValue: number,
-    fieldName: string,
-    projectId: number,
-  ): number | undefined {
-    if (value === undefined || value === null) {
-      return undefined;
-    }
-
-    // Handle NaN and Infinity
-    if (isNaN(value) || !isFinite(value)) {
-      this.logger.warn(
-        `Invalid numeric value for ${fieldName} in project ${projectId}: ${value}`,
-        {
-          projectId,
-          fieldName,
-          originalValue: value,
-          sanitizedValue: minValue,
-        },
-      );
-      return minValue;
-    }
-
-    // Clamp value to valid range
-    if (value < minValue) {
-      this.logger.warn(
-        `Value too small for ${fieldName} in project ${projectId}: ${value} < ${minValue}`,
-        {
-          projectId,
-          fieldName,
-          originalValue: value,
-          sanitizedValue: minValue,
-        },
-      );
-      return minValue;
-    }
-
-    if (value > maxValue) {
-      this.logger.warn(
-        `Value too large for ${fieldName} in project ${projectId}: ${value} > ${maxValue}`,
-        {
-          projectId,
-          fieldName,
-          originalValue: value,
-          sanitizedValue: maxValue,
-        },
-      );
-      return maxValue;
-    }
-
-    // Round to appropriate precision for decimal fields
-    const roundedValue = Math.round(value * 100) / 100; // Round to 2 decimal places
-
-    if (roundedValue !== value) {
-      this.logger.debug(
-        `Rounded ${fieldName} for project ${projectId}: ${value} -> ${roundedValue}`,
-        {
-          projectId,
-          fieldName,
-          originalValue: value,
-          roundedValue,
-        },
-      );
-    }
-
-    return roundedValue;
   }
 }

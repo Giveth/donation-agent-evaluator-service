@@ -245,9 +245,7 @@ export class DataFetchingService {
       lastUpdateDate: project.lastUpdateDate,
       lastUpdateContent: project.lastUpdateContent,
       socialMediaHandles,
-      qualityScore: project.qualityScore,
       givPowerRank: project.givPowerRank,
-      totalDonations: project.totalDonations,
       // Set status based on projectStatus
       status: project.projectStatus
         ? {
@@ -261,7 +259,6 @@ export class DataFetchingService {
       descriptionSummary: undefined,
       website: undefined,
       youtube: undefined,
-      totalRaised: project.totalDonations,
       lastUpdateTitle: project.lastUpdateTitle,
       mainCategory: undefined,
       subCategories: [],

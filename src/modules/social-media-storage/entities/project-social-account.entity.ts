@@ -32,26 +32,8 @@ export class ProjectSocialAccount {
   projectStatus: string;
 
   // Project metrics
-  @Column({
-    name: 'quality_score',
-    type: 'decimal',
-    precision: 10,
-    scale: 2,
-    nullable: true,
-  })
-  qualityScore?: number;
-
   @Column({ name: 'giv_power_rank', type: 'integer', nullable: true })
   givPowerRank?: number;
-
-  @Column({
-    name: 'total_donations',
-    type: 'decimal',
-    precision: 20,
-    scale: 2,
-    default: 0,
-  })
-  totalDonations: number;
 
   // Project update information
   @Column({ name: 'last_update_date', type: 'timestamp', nullable: true })

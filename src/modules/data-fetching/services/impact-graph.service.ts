@@ -408,13 +408,15 @@ export class ImpactGraphService {
         },
       );
 
-      const variables = {
+      const variables: any = {
         limit,
         offset,
-        searchTerm,
-        chainId,
-        listingStatus,
       };
+
+      // Only add filters if they have values
+      if (searchTerm) variables.searchTerm = searchTerm;
+      if (chainId) variables.chainId = chainId;
+      if (listingStatus) variables.listingStatus = listingStatus;
 
       const response = await this.graphqlClient.request<{
         causes: GraphQLCauseData[] | null;

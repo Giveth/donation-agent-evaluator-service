@@ -21,8 +21,6 @@ export const PROJECT_BY_SLUG_QUERY = gql`
       verificationStatus
       isImported
       giveBacks
-      qualityScore
-      totalDonations
       totalTraceDonations
       totalProjectUpdates
       countUniqueDonors
@@ -185,8 +183,6 @@ export const PROJECTS_BY_SLUGS_QUERY = gql`
           name
           symbol
         }
-        qualityScore
-        totalDonations
         totalProjectUpdates
         updatedAt
         latestUpdateCreationDate
@@ -250,7 +246,6 @@ export const ALL_CAUSES_WITH_PROJECTS_QUERY = gql`
       description
       chainId
       activeProjectsCount
-      totalRaised
       totalDistributed
       totalDonated
       creationDate
@@ -274,8 +269,6 @@ export const ALL_CAUSES_WITH_PROJECTS_QUERY = gql`
         verificationStatus
         isImported
         giveBacks
-        qualityScore
-        totalDonations
         totalTraceDonations
         totalProjectUpdates
         countUniqueDonors
@@ -387,7 +380,6 @@ export const CAUSE_BY_ID_QUERY = gql`
       description
       chainId
       activeProjectsCount
-      totalRaised
       totalDistributed
       totalDonated
       creationDate
@@ -441,8 +433,6 @@ export const ALL_PROJECTS_WITH_FILTERS_QUERY = gql`
         slug
         description
         projectType
-        qualityScore
-        totalDonations
         latestUpdateCreationDate
         updatedAt
         creationDate

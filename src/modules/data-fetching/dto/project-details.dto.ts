@@ -287,13 +287,6 @@ export class ProjectDetailsDto {
   youtube?: string;
 
   /**
-   * Total amount raised by the project
-   */
-  @IsOptional()
-  @IsNumber()
-  totalRaised?: number;
-
-  /**
    * Date of the last project update
    */
   @IsOptional()
@@ -344,13 +337,6 @@ export class ProjectDetailsDto {
   socialMediaHandles?: ProjectSocialMediaDto;
 
   /**
-   * Existing quality score from Giveth
-   */
-  @IsOptional()
-  @IsNumber()
-  qualityScore?: number;
-
-  /**
    * GIVpower rank for the project
    */
   @IsOptional()
@@ -391,13 +377,6 @@ export class ProjectDetailsDto {
   @IsOptional()
   @IsBoolean()
   listed?: boolean;
-
-  /**
-   * Total donations received
-   */
-  @IsOptional()
-  @IsNumber()
-  totalDonations?: number;
 
   /**
    * Total number of project updates
@@ -529,21 +508,18 @@ export class ProjectDetailsDto {
     descriptionSummary?: string;
     website?: string;
     youtube?: string;
-    totalRaised?: number;
     lastUpdateDate?: Date | string;
     lastUpdateContent?: string;
     lastUpdateTitle?: string;
     mainCategory?: string;
     subCategories?: string[];
     socialMediaHandles?: ProjectSocialMediaDto;
-    qualityScore?: number;
     givPowerRank?: number;
     status?: ProjectStatusDto;
     verificationStatus?: string;
     isGivbackEligible?: boolean;
     giveBacks?: boolean;
     listed?: boolean;
-    totalDonations?: number;
     totalProjectUpdates?: number;
     countUniqueDonors?: number;
     creationDate?: Date | string;
@@ -567,7 +543,6 @@ export class ProjectDetailsDto {
     this.descriptionSummary = data.descriptionSummary;
     this.website = data.website;
     this.youtube = data.youtube;
-    this.totalRaised = data.totalDonations; // Map totalDonations to totalRaised for compatibility
     this.lastUpdateDate =
       typeof data.lastUpdateDate === 'string'
         ? new Date(data.lastUpdateDate)
@@ -577,14 +552,12 @@ export class ProjectDetailsDto {
     this.mainCategory = data.mainCategory;
     this.subCategories = data.subCategories;
     this.socialMediaHandles = data.socialMediaHandles;
-    this.qualityScore = data.qualityScore;
     this.givPowerRank = data.givPowerRank;
     this.status = data.status;
     this.verificationStatus = data.verificationStatus;
     this.isGivbackEligible = data.isGivbackEligible;
     this.giveBacks = data.giveBacks;
     this.listed = data.listed;
-    this.totalDonations = data.totalDonations;
     this.totalProjectUpdates = data.totalProjectUpdates;
     this.countUniqueDonors = data.countUniqueDonors;
     this.creationDate =
@@ -703,21 +676,18 @@ export function createProjectDetailsDto(project: unknown): ProjectDetailsDto {
     descriptionSummary: proj.descriptionSummary,
     website: proj.website,
     youtube: proj.youtube,
-    totalRaised: proj.totalDonations,
     lastUpdateDate,
     lastUpdateContent,
     lastUpdateTitle,
     mainCategory,
     subCategories,
     socialMediaHandles,
-    qualityScore: proj.qualityScore,
     givPowerRank,
     status: proj.status ? new ProjectStatusDto(proj.status) : undefined,
     verificationStatus: proj.verificationStatus,
     isGivbackEligible: proj.isGivbackEligible,
     giveBacks: proj.giveBacks,
     listed: proj.listed,
-    totalDonations: proj.totalDonations,
     totalProjectUpdates: proj.totalProjectUpdates,
     countUniqueDonors: proj.countUniqueDonors,
     creationDate: proj.creationDate,

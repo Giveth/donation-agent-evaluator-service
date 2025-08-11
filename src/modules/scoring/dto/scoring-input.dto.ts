@@ -59,13 +59,6 @@ export class ScoringInputDto {
   socialPosts!: SocialPostDto[];
 
   /**
-   * Existing quality score from Giveth (0-100)
-   */
-  @IsOptional()
-  @IsNumber()
-  qualityScore?: number;
-
-  /**
    * GIVpower rank for the project
    */
   @IsOptional()

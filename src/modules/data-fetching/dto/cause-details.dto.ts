@@ -115,9 +115,6 @@ export class CauseDetailsDto {
   activeProjectsCount?: number;
 
   @IsNumber()
-  totalRaised!: number;
-
-  @IsNumber()
   totalDistributed!: number;
 
   @IsNumber()
@@ -168,7 +165,6 @@ export class CauseDetailsDto {
     status: CauseStatus;
     listingStatus: ListingStatus;
     activeProjectsCount?: number;
-    totalRaised: number;
     totalDistributed: number;
     totalDonated: number;
     createdAt: Date | string;
@@ -192,7 +188,6 @@ export class CauseDetailsDto {
     this.status = data.status;
     this.listingStatus = data.listingStatus;
     this.activeProjectsCount = data.activeProjectsCount;
-    this.totalRaised = data.totalRaised;
     this.totalDistributed = data.totalDistributed;
     this.totalDonated = data.totalDonated;
     this.createdAt =
@@ -265,7 +260,6 @@ export function createCauseDetailsDto(data: any): CauseDetailsDto {
     status: data.status,
     listingStatus: data.listingStatus,
     activeProjectsCount: data.activeProjectsCount,
-    totalRaised: data.totalRaised,
     totalDistributed: data.totalDistributed,
     totalDonated: data.totalDonated,
     createdAt: data.createdAt,

@@ -39,7 +39,6 @@ describe('ScoringService', () => {
         platform: SocialMediaPlatform.TWITTER,
       },
     ],
-    qualityScore: 80,
     givPowerRank: 50,
     totalProjectCount: 1000,
     causeTitle: 'Test Cause',
@@ -120,7 +119,6 @@ describe('ScoringService', () => {
       // Use input with no other scoring components to ensure we get 0
       const inputWithoutOtherScores = new ScoringInputDto({
         ...mockInput,
-        qualityScore: undefined,
         givPowerRank: undefined,
         lastUpdateDate: undefined,
         socialPosts: [],

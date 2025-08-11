@@ -6,11 +6,12 @@ export class DropUnusedNumericFields1754935933272
   name = 'DropUnusedNumericFields1754935933272';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    // Use IF EXISTS to prevent errors if columns were already dropped
     await queryRunner.query(
-      `ALTER TABLE "project_social_accounts" DROP COLUMN "quality_score"`,
+      `ALTER TABLE "project_social_accounts" DROP COLUMN IF EXISTS "quality_score"`,
     );
     await queryRunner.query(
-      `ALTER TABLE "project_social_accounts" DROP COLUMN "total_donations"`,
+      `ALTER TABLE "project_social_accounts" DROP COLUMN IF EXISTS "total_donations"`,
     );
   }
 

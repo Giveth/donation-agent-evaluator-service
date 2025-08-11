@@ -190,7 +190,7 @@ export class ProjectSyncProcessor {
   }
 
   /**
-   * Synchronizes a single project's data to the local database
+   * Synchronizes a single project's data to the local database with data validation
    * @param project - Project data from GraphQL
    * @param queryRunner - Database query runner for transaction
    * @param correlationId - Correlation ID for tracking
@@ -204,15 +204,32 @@ export class ProjectSyncProcessor {
       // Use social media handles that were already extracted during DTO creation
       const socialMediaHandles = project.socialMediaHandles ?? {};
 
-      // Prepare project data for upsert
+      // Validate and sanitize numeric fields to prevent overflow
+      const sanitizedTotalDonations = this.sanitizeNumericValue(
+        project.totalDonations,
+        0,
+        999999999999999999.99, // Max value for numeric(20,2)
+        'totalDonations',
+        project.id,
+      );
+
+      const sanitizedQualityScore = this.sanitizeNumericValue(
+        project.qualityScore,
+        0,
+        99999999.99, // Max value for numeric(10,2)
+        'qualityScore',
+        project.id,
+      );
+
+      // Prepare project data for upsert with sanitized values
       const projectData = {
         // Basic project information
         title: project.title,
         slug: project.slug,
         description: project.description,
 
-        // Quality and ranking information
-        qualityScore: project.qualityScore,
+        // Quality and ranking information (sanitized)
+        qualityScore: sanitizedQualityScore,
         givPowerRank: project.projectPower?.powerRank,
 
         // Project status and verification
@@ -222,8 +239,8 @@ export class ProjectSyncProcessor {
         lastUpdateDate: project.lastUpdateDate,
         lastUpdateContent: project.lastUpdateContent,
 
-        // Financial and engagement metrics
-        totalDonations: project.totalDonations,
+        // Financial and engagement metrics (sanitized)
+        totalDonations: sanitizedTotalDonations,
 
         // Social media URLs
         xUrl: socialMediaHandles.X,
@@ -242,6 +259,15 @@ export class ProjectSyncProcessor {
           creationDate: project.creationDate,
           updatedAt: project.updatedAt,
           latestUpdateCreationDate: project.latestUpdateCreationDate,
+          // Store original values if they were sanitized
+          originalTotalDonations:
+            sanitizedTotalDonations !== project.totalDonations
+              ? project.totalDonations
+              : undefined,
+          originalQualityScore:
+            sanitizedQualityScore !== project.qualityScore
+              ? project.qualityScore
+              : undefined,
         },
       };
 
@@ -261,16 +287,33 @@ export class ProjectSyncProcessor {
           projectId: project.id,
           xUrl: socialMediaHandles.X,
           farcasterUrl: socialMediaHandles.FARCASTER,
+          sanitized: {
+            totalDonations: sanitizedTotalDonations !== project.totalDonations,
+            qualityScore: sanitizedQualityScore !== project.qualityScore,
+          },
         },
       );
     } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const isNumericOverflow = errorMessage.includes('numeric field overflow');
+
       this.logger.error(
         `Failed to sync project data for ${project.title} (ID: ${project.id})`,
         {
-          error: error instanceof Error ? error.message : String(error),
+          error: errorMessage,
           stack: error instanceof Error ? error.stack : undefined,
           correlationId,
           projectId: project.id,
+          isNumericOverflow,
+          // Log the actual values that caused the issue
+          projectData: isNumericOverflow
+            ? {
+                totalDonations: project.totalDonations,
+                qualityScore: project.qualityScore,
+                givPowerRank: project.projectPower?.powerRank,
+              }
+            : undefined,
         },
       );
       throw error;
@@ -609,8 +652,8 @@ export class ProjectSyncProcessor {
   }
 
   /**
-   * Process a single batch of projects with its own transaction
-   * This method provides transaction isolation and health monitoring
+   * Process a single batch of projects with individual transaction isolation per project
+   * This method provides transaction isolation PER PROJECT to prevent one failure from corrupting the entire batch
    * @param batch - Array of projects to process
    * @param correlationId - Correlation ID for tracking
    * @param batchNumber - Batch number for logging
@@ -621,150 +664,229 @@ export class ProjectSyncProcessor {
     correlationId: string,
     batchNumber: number,
   ): Promise<{ success: boolean; processed: number; errors: number }> {
-    let queryRunner: QueryRunner | null = null;
     let processed = 0;
     let errors = 0;
+    const batchStartTime = Date.now();
 
-    try {
-      // Create and validate query runner
-      queryRunner = await this.createHealthyQueryRunner(correlationId);
+    this.logger.debug(
+      `Starting batch ${batchNumber} with ${batch.length} projects (each with isolated transaction)`,
+      { correlationId, batchNumber, batchSize: batch.length },
+    );
 
-      const batchStartTime = Date.now();
-      this.logger.debug(
-        `Starting batch ${batchNumber} transaction with ${batch.length} projects`,
-        { correlationId, batchNumber, batchSize: batch.length },
-      );
-
-      await queryRunner.startTransaction();
-
-      // Process projects within the batch sequentially (safer for transactions)
-      // This eliminates race conditions and simplifies error handling
-      for (const { project, causeId, causeTitle } of batch) {
-        try {
-          await this.syncSingleProject(project, queryRunner, correlationId);
-          processed++;
-
-          this.logger.debug(
-            `Successfully synced project ${project.title} (ID: ${project.id}) in batch ${batchNumber}`,
-            {
-              correlationId,
-              batchNumber,
-              projectId: project.id,
-              processed,
-              remaining: batch.length - processed,
-            },
-          );
-        } catch (error) {
-          errors++;
-          this.logger.warn(
-            `Failed to sync project ${project.title} (ID: ${project.id}) in batch ${batchNumber}`,
-            {
-              error: error instanceof Error ? error.message : String(error),
-              stack: error instanceof Error ? error.stack : undefined,
-              correlationId,
-              batchNumber,
-              projectId: project.id,
-              causeId,
-              causeTitle,
-            },
-          );
-          // Continue processing other projects in the batch
-        }
-      }
-
-      // Commit the batch transaction
-      await queryRunner.commitTransaction();
-
-      const batchTime = Date.now() - batchStartTime;
-      const success = errors < batch.length; // Success if at least one project was processed
-
-      if (success) {
-        this.logger.debug(
-          `Batch ${batchNumber} completed successfully: ${processed}/${batch.length} projects, ${errors} errors, ${batchTime}ms`,
-          {
-            correlationId,
-            batchNumber,
-            processed,
-            total: batch.length,
-            errors,
-            processingTimeMs: batchTime,
-          },
-        );
-      } else {
-        this.logger.error(
-          `Batch ${batchNumber} failed completely: 0/${batch.length} projects processed, ${errors} errors, ${batchTime}ms`,
-          {
-            correlationId,
-            batchNumber,
-            processed: 0,
-            total: batch.length,
-            errors,
-            processingTimeMs: batchTime,
-          },
-        );
-      }
-
-      return { success, processed, errors };
-    } catch (error) {
-      // Rollback transaction on batch-level errors
-      if (queryRunner) {
-        try {
-          await queryRunner.rollbackTransaction();
-          this.logger.debug(
-            `Rolled back batch ${batchNumber} transaction due to error`,
-            { correlationId, batchNumber, processed, errors },
-          );
-        } catch (rollbackError) {
-          this.logger.error(
-            `Failed to rollback batch ${batchNumber} transaction`,
-            {
-              error:
-                rollbackError instanceof Error
-                  ? rollbackError.message
-                  : String(rollbackError),
-              originalError:
-                error instanceof Error ? error.message : String(error),
-              correlationId,
-              batchNumber,
-            },
-          );
-        }
-      }
-
-      this.logger.error(`Batch ${batchNumber} transaction failed completely`, {
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
+    // Process each project with its own isolated transaction and retry logic
+    for (const { project, causeId, causeTitle } of batch) {
+      const result = await this.processSingleProjectWithRetry(
+        project,
+        causeId,
+        causeTitle,
         correlationId,
         batchNumber,
-        processed,
-        total: batch.length,
-      });
+      );
 
-      return { success: false, processed, errors: batch.length };
-    } finally {
-      // Always release the query runner
-      if (queryRunner) {
-        try {
-          await queryRunner.release();
-          this.logger.debug(`Released query runner for batch ${batchNumber}`, {
+      if (result.success) {
+        processed++;
+      } else {
+        errors++;
+      }
+    }
+
+    const batchTime = Date.now() - batchStartTime;
+    const success = processed > 0; // Success if at least one project was processed
+
+    if (success) {
+      this.logger.debug(
+        `Batch ${batchNumber} completed: ${processed}/${batch.length} projects succeeded, ${errors} failed, ${batchTime}ms`,
+        {
+          correlationId,
+          batchNumber,
+          processed,
+          total: batch.length,
+          errors,
+          successRate: `${((processed / batch.length) * 100).toFixed(2)}%`,
+          processingTimeMs: batchTime,
+        },
+      );
+    } else {
+      this.logger.error(
+        `Batch ${batchNumber} failed completely: 0/${batch.length} projects processed, all ${errors} failed, ${batchTime}ms`,
+        {
+          correlationId,
+          batchNumber,
+          processed: 0,
+          total: batch.length,
+          errors,
+          processingTimeMs: batchTime,
+        },
+      );
+    }
+
+    return { success, processed, errors };
+  }
+
+  /**
+   * Process a single project with retry logic and isolated transaction
+   * @param project - Project data to sync
+   * @param causeId - Associated cause ID
+   * @param causeTitle - Associated cause title
+   * @param correlationId - Correlation ID for tracking
+   * @param batchNumber - Batch number for logging
+   * @returns Processing result
+   */
+  private async processSingleProjectWithRetry(
+    project: any,
+    causeId: string,
+    causeTitle: string,
+    correlationId: string,
+    batchNumber: number,
+  ): Promise<{ success: boolean; attemptsMade: number }> {
+    const maxRetries = 2; // Retry once on failure
+    let attemptsMade = 0;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      attemptsMade = attempt;
+      const projectStartTime = Date.now();
+      let queryRunner: QueryRunner | null = null;
+
+      try {
+        // Create a fresh query runner for each project
+        queryRunner = await this.createHealthyQueryRunner(correlationId);
+
+        // Start a new transaction for this specific project
+        await queryRunner.startTransaction();
+
+        // Sync the single project with data validation
+        await this.syncSingleProject(project, queryRunner, correlationId);
+
+        // Commit this project's transaction
+        await queryRunner.commitTransaction();
+
+        const projectTime = Date.now() - projectStartTime;
+        this.logger.debug(
+          `Successfully synced project ${project.title} (ID: ${project.id}) in batch ${batchNumber} [${projectTime}ms, attempt ${attempt}/${maxRetries}]`,
+          {
             correlationId,
             batchNumber,
-          });
-        } catch (releaseError) {
+            projectId: project.id,
+            attempt,
+            processingTimeMs: projectTime,
+          },
+        );
+
+        return { success: true, attemptsMade };
+      } catch (error) {
+        // Rollback this specific project's transaction
+        if (queryRunner && !queryRunner.isReleased) {
+          try {
+            if (queryRunner.isTransactionActive) {
+              await queryRunner.rollbackTransaction();
+              this.logger.debug(
+                `Rolled back transaction for project ${project.id} in batch ${batchNumber} (attempt ${attempt})`,
+                { correlationId, batchNumber, projectId: project.id, attempt },
+              );
+            }
+          } catch (rollbackError) {
+            this.logger.error(
+              `Failed to rollback transaction for project ${project.id}`,
+              {
+                error:
+                  rollbackError instanceof Error
+                    ? rollbackError.message
+                    : String(rollbackError),
+                correlationId,
+                batchNumber,
+                projectId: project.id,
+                attempt,
+              },
+            );
+          }
+        }
+
+        const projectTime = Date.now() - projectStartTime;
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        const isNumericOverflow = errorMessage.includes(
+          'numeric field overflow',
+        );
+        const isTransactionAborted = errorMessage.includes(
+          'current transaction is aborted',
+        );
+        const isConnectionError =
+          errorMessage.includes('connection') ||
+          errorMessage.includes('timeout');
+
+        // Don't retry on data errors, only on transient errors
+        const shouldRetry =
+          attempt < maxRetries && (isConnectionError || isTransactionAborted);
+
+        this.logger.warn(
+          `Failed to sync project ${project.title} (ID: ${project.id}) in batch ${batchNumber} [${projectTime}ms, attempt ${attempt}/${maxRetries}]`,
+          {
+            error: errorMessage,
+            stack: error instanceof Error ? error.stack : undefined,
+            correlationId,
+            batchNumber,
+            projectId: project.id,
+            causeId,
+            causeTitle,
+            isNumericOverflow,
+            isTransactionAborted,
+            isConnectionError,
+            willRetry: shouldRetry,
+            totalDonations: project.totalDonations,
+            processingTimeMs: projectTime,
+            attempt,
+          },
+        );
+
+        // Log specific numeric overflow details for debugging
+        if (isNumericOverflow) {
           this.logger.error(
-            `Failed to release query runner for batch ${batchNumber}`,
+            `Numeric overflow detected for project ${project.id} - data will be sanitized on next attempt`,
             {
-              error:
-                releaseError instanceof Error
-                  ? releaseError.message
-                  : String(releaseError),
+              projectId: project.id,
+              projectTitle: project.title,
+              totalDonations: project.totalDonations,
+              qualityScore: project.qualityScore,
+              givPowerRank: project.projectPower?.powerRank,
               correlationId,
-              batchNumber,
+              attempt,
             },
           );
+        }
+
+        // If we shouldn't retry or this was the last attempt, return failure
+        if (!shouldRetry) {
+          return { success: false, attemptsMade };
+        }
+
+        // Add a small delay before retry
+        const retryDelay = 500 * attempt; // 500ms, 1000ms
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+      } finally {
+        // Always release the query runner for this project
+        if (queryRunner && !queryRunner.isReleased) {
+          try {
+            await queryRunner.release();
+          } catch (releaseError) {
+            this.logger.error(
+              `Failed to release query runner for project ${project.id}`,
+              {
+                error:
+                  releaseError instanceof Error
+                    ? releaseError.message
+                    : String(releaseError),
+                correlationId,
+                batchNumber,
+                projectId: project.id,
+                attempt,
+              },
+            );
+          }
         }
       }
     }
+
+    return { success: false, attemptsMade };
   }
 
   /**
@@ -1137,5 +1259,84 @@ export class ProjectSyncProcessor {
     }
 
     throw lastError;
+  }
+
+  /**
+   * Sanitize numeric values to prevent database overflow errors
+   * @param value - The value to sanitize
+   * @param minValue - Minimum allowed value
+   * @param maxValue - Maximum allowed value
+   * @param fieldName - Name of the field for logging
+   * @param projectId - Project ID for logging
+   * @returns Sanitized value within bounds
+   */
+  private sanitizeNumericValue(
+    value: number | undefined | null,
+    minValue: number,
+    maxValue: number,
+    fieldName: string,
+    projectId: number,
+  ): number | undefined {
+    if (value === undefined || value === null) {
+      return undefined;
+    }
+
+    // Handle NaN and Infinity
+    if (isNaN(value) || !isFinite(value)) {
+      this.logger.warn(
+        `Invalid numeric value for ${fieldName} in project ${projectId}: ${value}`,
+        {
+          projectId,
+          fieldName,
+          originalValue: value,
+          sanitizedValue: minValue,
+        },
+      );
+      return minValue;
+    }
+
+    // Clamp value to valid range
+    if (value < minValue) {
+      this.logger.warn(
+        `Value too small for ${fieldName} in project ${projectId}: ${value} < ${minValue}`,
+        {
+          projectId,
+          fieldName,
+          originalValue: value,
+          sanitizedValue: minValue,
+        },
+      );
+      return minValue;
+    }
+
+    if (value > maxValue) {
+      this.logger.warn(
+        `Value too large for ${fieldName} in project ${projectId}: ${value} > ${maxValue}`,
+        {
+          projectId,
+          fieldName,
+          originalValue: value,
+          sanitizedValue: maxValue,
+        },
+      );
+      return maxValue;
+    }
+
+    // Round to appropriate precision for decimal fields
+    const roundedValue = Math.round(value * 100) / 100; // Round to 2 decimal places
+
+    if (roundedValue !== value) {
+      this.logger.debug(
+        `Rounded ${fieldName} for project ${projectId}: ${value} -> ${roundedValue}`,
+        {
+          projectId,
+          fieldName,
+          originalValue: value,
+          roundedValue,
+        },
+      );
+    }
+
+    return roundedValue;
   }
 }

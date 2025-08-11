@@ -35,7 +35,7 @@ export class ProjectSocialAccount {
   @Column({
     name: 'quality_score',
     type: 'decimal',
-    precision: 5,
+    precision: 10,
     scale: 2,
     nullable: true,
   })
@@ -47,7 +47,7 @@ export class ProjectSocialAccount {
   @Column({
     name: 'total_donations',
     type: 'decimal',
-    precision: 15,
+    precision: 20,
     scale: 2,
     default: 0,
   })

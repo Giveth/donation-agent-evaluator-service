@@ -8,8 +8,8 @@ export class AddNumericFieldConstraints1754933538620
     // Cap total_donations at the maximum allowed value for numeric(20,2)
     await queryRunner.query(`
             UPDATE project_social_accounts 
-            SET total_donations = 999999999999999999.99 
-            WHERE total_donations > 999999999999999999.99
+            SET total_donations = 99999999999999.99 
+            WHERE total_donations > 99999999999999.99
         `);
 
     // Cap quality_score at the maximum allowed value for numeric(10,2)
@@ -41,7 +41,7 @@ export class AddNumericFieldConstraints1754933538620
     await queryRunner.query(`
             ALTER TABLE project_social_accounts 
             ADD CONSTRAINT check_total_donations_range 
-            CHECK (total_donations >= 0 AND total_donations <= 999999999999999999.99)
+            CHECK (total_donations >= 0 AND total_donations <= 99999999999999.99)
         `);
 
     await queryRunner.query(`
@@ -61,8 +61,8 @@ export class AddNumericFieldConstraints1754933538620
             RETURNS TRIGGER AS $$
             BEGIN
                 -- Check and cap total_donations
-                IF NEW.total_donations > 999999999999999999.99 THEN
-                    NEW.total_donations := 999999999999999999.99;
+                IF NEW.total_donations > 99999999999999.99 THEN
+                    NEW.total_donations := 99999999999999.99;
                     RAISE NOTICE 'total_donations capped at maximum value for project %', NEW.project_id;
                 ELSIF NEW.total_donations < 0 THEN
                     NEW.total_donations := 0;

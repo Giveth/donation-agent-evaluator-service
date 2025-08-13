@@ -223,7 +223,7 @@ Please provide scores for:
 
 4. FARCASTER QUALITY (0-100): Evaluate the quality of Farcaster content specifically. Consider engagement, professionalism, and value provided. If no Farcaster activity, score 0.
 
-5. SOCIAL MEDIA RELEVANCE (0-100): Evaluate how well ALL social media posts (Twitter + Farcaster combined) align with the cause's mission, goals, and specified categories. If no social media activity, score 0.
+5. SOCIAL MEDIA RELEVANCE (0-100): Evaluate how well ALL social media posts (Twitter + Farcaster combined) align with the cause's goals or mission as stated in the cause description and the cause's categories. If no social media activity, score 0.
    RELEVANCE SCORING RUBRIC:
    - 80-100: Exceptional alignment - directly supports cause mission with clear evidence
    - 60-79: Strong alignment - closely matches cause goals with good evidence  
@@ -231,7 +231,7 @@ Please provide scores for:
    - 20-39: Weak alignment - minimal connection to cause
    - 0-19: No meaningful alignment - unrelated to cause
 
-6. PROJECT RELEVANCE (0-100): Evaluate how well the project information aligns with the cause's mission, goals, and specified categories. Base your assessment on: project title, project description, latest update title, and latest update content. Be generous with scoring if project genuinely works toward cause goals.
+6. PROJECT RELEVANCE (0-100): Evaluate how well the project information aligns with the cause's goals or mission as stated in the cause description and the causes's categories. Base your assessment on: project title, project description, latest update title, and latest update content. Be generous with scoring if project genuinely works toward cause goals.
    RELEVANCE SCORING RUBRIC:
    - 80-100: Exceptional alignment - directly supports cause mission with clear evidence
    - 60-79: Strong alignment - closely matches cause goals with good evidence  
@@ -239,13 +239,18 @@ Please provide scores for:
    - 20-39: Weak alignment - minimal connection to cause
    - 0-19: No meaningful alignment - unrelated to cause
 
-7. EVIDENCE OF IMPACT (0-100): Evaluate evidence of social/environmental impact or philanthropic action demonstrated in project updates, Twitter posts, and Farcaster posts. Look for concrete examples of positive impact, beneficiaries helped, or meaningful change created.
-   IMPACT SCORING RUBRIC:
-   - 80-100: Exceptional impact - clear, documented evidence of significant positive change
-   - 60-79: Strong impact - good evidence of meaningful positive effects
-   - 40-59: Moderate impact - some evidence of positive change
-   - 20-39: Weak impact - minimal or unclear evidence of impact
-   - 0-19: No meaningful impact - no evidence of positive change
+7. EVIDENCE OF IMPACT (0–100): Evaluate the project’s demonstrated results and progress toward positive change included in their project updates, Twitter posts and/or Farcaster posts. Scope of impact includes:  
+- Social or environmental impact (measurable benefits to people, communities, or ecosystems).  
+- Philanthropic action (charitable activities, donations, volunteer initiatives).  
+- Mission-aligned action (contributions toward the goals or vision stated in the Cause description, even if not strictly social/environmental).  
+
+  EVIDENCE OF IMPACT SCORING RUBRIC:  
+  - 80–100: Exceptional impact – clear, documented, substantial evidence of positive change or mission advancement, strongly aligned with Cause goals.  
+  - 60–79: Strong impact – good evidence of meaningful results or mission-aligned contributions.  
+  - 40–59: Moderate impact – some evidence of positive change or alignment with Cause goals.  
+  - 20–39: Weak impact – minimal, vague, or indirect evidence of change or alignment.  
+  - 0–19: No meaningful impact – no evidence of positive change or mission advancement.  
+
 
 Respond in JSON format:
 {

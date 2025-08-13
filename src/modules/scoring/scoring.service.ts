@@ -44,12 +44,12 @@ export class ScoringService {
 
     this.socialFrequencyDays = this.configService.get<number>(
       'SCORING_SOCIAL_FREQUENCY_DAYS',
-      30, // Default: Consider posts from last 30 days
+      60, // Default: Consider posts from last 60 days
     );
 
     this.minPostsForFullFrequencyScore = this.configService.get<number>(
       'SCORING_MIN_POSTS_FOR_FULL_FREQUENCY',
-      8, // Default: 8 posts in 30 days for full score
+      45, // Default: 45 posts in 60 days for full score
     );
 
     this.logger.log(
@@ -233,9 +233,9 @@ Please provide scores for:
 
 6. PROJECT RELEVANCE (0-100): Evaluate how well the project information aligns with the cause's goals or mission as stated in the cause description and the causes's categories. Base your assessment on: project title, project description, latest update title, and latest update content. Be generous with scoring if project genuinely works toward cause goals.
    RELEVANCE SCORING RUBRIC:
-   - 80-100: Exceptional alignment - directly supports cause mission with clear evidence
-   - 60-79: Strong alignment - closely matches cause goals with good evidence  
-   - 40-59: Moderate alignment - some connection but not perfectly aligned
+   - 90-100: Exceptional alignment - a near perfect match with the goals, mission or theme of the Cause 
+   - 65-89: Strong alignment - closely matches cause goals, mission or theme it supports 
+   - 40-64: Moderate alignment - some connection but not perfectly aligned
    - 20-39: Weak alignment - minimal connection to cause
    - 0-19: No meaningful alignment - unrelated to cause
 

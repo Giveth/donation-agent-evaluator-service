@@ -201,28 +201,51 @@ ${twitterPosts.length > 0 ? JSON.stringify(twitterPosts, null, 2) : 'No recent T
 FARCASTER POSTS:
 ${farcasterPosts.length > 0 ? JSON.stringify(farcasterPosts, null, 2) : 'No recent Farcaster activity'}
 
-SCORING RUBRIC:
-- 80-100: Exceptional alignment/quality - directly supports cause mission with clear evidence
-- 60-79: Strong alignment/quality - closely matches cause goals with good evidence  
-- 40-59: Moderate alignment/quality - some connection but not perfectly aligned
-- 20-39: Weak alignment/quality - minimal connection or poor quality
-- 0-19: No meaningful alignment/quality - unrelated or very poor quality
-
 Please provide scores for:
 
 1. PROJECT INFO QUALITY (0-100): Evaluate the quality, completeness, and professionalism of the project description and updates. Consider clarity, detail, transparency, and communication quality.
+   SCORING RUBRIC:
+   - 80-100: Exceptional quality - very clear, detailed, professional, transparent
+   - 60-79: Strong quality - clear and well-structured with good detail
+   - 40-59: Moderate quality - adequate information but could be clearer
+   - 20-39: Weak quality - limited information, unclear or unprofessional
+   - 0-19: Poor quality - very limited, confusing, or unprofessional content
 
 2. SOCIAL MEDIA QUALITY (0-100): Overall social media content quality score (combination of Twitter and Farcaster).
+   SCORING RUBRIC:
+   - 80-100: Exceptional content - highly engaging, professional, valuable to followers
+   - 60-79: Strong content - good engagement, professional tone, informative
+   - 40-59: Moderate content - adequate posts but could be more engaging
+   - 20-39: Weak content - limited engagement, inconsistent quality
+   - 0-19: Poor content - low quality, irrelevant, or unprofessional posts
 
 3. TWITTER QUALITY (0-100): Evaluate the quality of Twitter content specifically. Consider engagement, professionalism, and value provided. If no Twitter activity, score 0.
 
 4. FARCASTER QUALITY (0-100): Evaluate the quality of Farcaster content specifically. Consider engagement, professionalism, and value provided. If no Farcaster activity, score 0.
 
 5. SOCIAL MEDIA RELEVANCE (0-100): Evaluate how well ALL social media posts (Twitter + Farcaster combined) align with the cause's mission, goals, and specified categories. If no social media activity, score 0.
+   RELEVANCE SCORING RUBRIC:
+   - 80-100: Exceptional alignment - directly supports cause mission with clear evidence
+   - 60-79: Strong alignment - closely matches cause goals with good evidence  
+   - 40-59: Moderate alignment - some connection but not perfectly aligned
+   - 20-39: Weak alignment - minimal connection to cause
+   - 0-19: No meaningful alignment - unrelated to cause
 
 6. PROJECT RELEVANCE (0-100): Evaluate how well the project information aligns with the cause's mission, goals, and specified categories. Base your assessment on: project title, project description, latest update title, and latest update content. Be generous with scoring if project genuinely works toward cause goals.
+   RELEVANCE SCORING RUBRIC:
+   - 80-100: Exceptional alignment - directly supports cause mission with clear evidence
+   - 60-79: Strong alignment - closely matches cause goals with good evidence  
+   - 40-59: Moderate alignment - some connection but not perfectly aligned
+   - 20-39: Weak alignment - minimal connection to cause
+   - 0-19: No meaningful alignment - unrelated to cause
 
 7. EVIDENCE OF IMPACT (0-100): Evaluate evidence of social/environmental impact or philanthropic action demonstrated in project updates, Twitter posts, and Farcaster posts. Look for concrete examples of positive impact, beneficiaries helped, or meaningful change created.
+   IMPACT SCORING RUBRIC:
+   - 80-100: Exceptional impact - clear, documented evidence of significant positive change
+   - 60-79: Strong impact - good evidence of meaningful positive effects
+   - 40-59: Moderate impact - some evidence of positive change
+   - 20-39: Weak impact - minimal or unclear evidence of impact
+   - 0-19: No meaningful impact - no evidence of positive change
 
 Respond in JSON format:
 {

@@ -85,9 +85,8 @@ describe('ScoringService', () => {
                 twitterQualityScore: 85,
                 farcasterQualityScore: 75,
                 relevanceToCauseScore: 90,
-                twitterRelevanceScore: 85,
-                farcasterRelevanceScore: 95,
-                projectRelevanceScore: 90,
+                socialMediaRelevanceScore: 85,
+                projectRelevanceScore: 95,
                 evidenceOfImpactScore: 85,
                 projectInfoQualityReasoning: 'Good project description',
                 socialMediaQualityReasoning: 'Active social media presence',
@@ -109,7 +108,7 @@ describe('ScoringService', () => {
       expect(result.breakdown).toBeDefined();
       expect(result.breakdown.projectInfoQualityScore).toBe(75);
       expect(result.breakdown.socialMediaQualityScore).toBe(80); // (85 * 0.5) + (75 * 0.5) = 80
-      expect(result.breakdown.relevanceToCauseScore).toBe(90); // (85 * 0.33) + (95 * 0.33) + (90 * 0.34) = 90
+      expect(result.breakdown.relevanceToCauseScore).toBe(90); // (85 * 0.5) + (95 * 0.5) = 90
       expect(result.breakdown.evidenceOfImpactScore).toBe(85);
     });
 
@@ -145,7 +144,12 @@ describe('ScoringService', () => {
               content: JSON.stringify({
                 projectInfoQualityScore: 75,
                 socialMediaQualityScore: 0,
+                twitterQualityScore: 0,
+                farcasterQualityScore: 0,
                 relevanceToCauseScore: 90,
+                socialMediaRelevanceScore: 0,
+                projectRelevanceScore: 90,
+                evidenceOfImpactScore: 75,
               }),
             },
           },
@@ -173,7 +177,12 @@ describe('ScoringService', () => {
               content: JSON.stringify({
                 projectInfoQualityScore: 75,
                 socialMediaQualityScore: 80,
+                twitterQualityScore: 85,
+                farcasterQualityScore: 75,
                 relevanceToCauseScore: 90,
+                socialMediaRelevanceScore: 85,
+                projectRelevanceScore: 95,
+                evidenceOfImpactScore: 80,
               }),
             },
           },
@@ -213,7 +222,12 @@ describe('ScoringService', () => {
                 content: JSON.stringify({
                   projectInfoQualityScore: 0,
                   socialMediaQualityScore: 0,
+                  twitterQualityScore: 0,
+                  farcasterQualityScore: 0,
                   relevanceToCauseScore: 0,
+                  socialMediaRelevanceScore: 0,
+                  projectRelevanceScore: 0,
+                  evidenceOfImpactScore: 0,
                 }),
               },
             },
@@ -266,7 +280,12 @@ describe('ScoringService', () => {
                 content: JSON.stringify({
                   projectInfoQualityScore: 0,
                   socialMediaQualityScore: 0,
+                  twitterQualityScore: 0,
+                  farcasterQualityScore: 0,
                   relevanceToCauseScore: 0,
+                  socialMediaRelevanceScore: 0,
+                  projectRelevanceScore: 0,
+                  evidenceOfImpactScore: 0,
                 }),
               },
             },
@@ -284,11 +303,13 @@ describe('ScoringService', () => {
     });
 
     it('should calculate GIVpower rank score correctly', async () => {
+      // NOTE: GIVpower scoring is currently disabled and returns 0 for all projects
+      // due to Impact Graph issues. This test validates the current behavior.
       const testCases = [
-        { rank: 1, totalProjects: 1000, expectedScore: 100 }, // Top rank
-        { rank: 100, totalProjects: 1000, expectedScore: 90 }, // Top 10%
-        { rank: 500, totalProjects: 1000, expectedScore: 50 }, // Middle
-        { rank: 1000, totalProjects: 1000, expectedScore: 0 }, // Last
+        { rank: 1, totalProjects: 1000, expectedScore: 0 }, // Currently disabled
+        { rank: 100, totalProjects: 1000, expectedScore: 0 }, // Currently disabled
+        { rank: 500, totalProjects: 1000, expectedScore: 0 }, // Currently disabled
+        { rank: 1000, totalProjects: 1000, expectedScore: 0 }, // Currently disabled
       ];
 
       for (const { rank, totalProjects, expectedScore } of testCases) {
@@ -305,7 +326,12 @@ describe('ScoringService', () => {
                 content: JSON.stringify({
                   projectInfoQualityScore: 0,
                   socialMediaQualityScore: 0,
+                  twitterQualityScore: 0,
+                  farcasterQualityScore: 0,
                   relevanceToCauseScore: 0,
+                  socialMediaRelevanceScore: 0,
+                  projectRelevanceScore: 0,
+                  evidenceOfImpactScore: 0,
                 }),
               },
             },
@@ -335,8 +361,7 @@ describe('ScoringService', () => {
                 twitterQualityScore: 100,
                 farcasterQualityScore: 100,
                 relevanceToCauseScore: 100,
-                twitterRelevanceScore: 100,
-                farcasterRelevanceScore: 100,
+                socialMediaRelevanceScore: 100,
                 projectRelevanceScore: 100,
                 evidenceOfImpactScore: 100,
               }),
@@ -362,8 +387,9 @@ describe('ScoringService', () => {
 
       const result = await service.calculateCauseScore(input);
 
-      // With all components at 100, the final score should be 100
-      expect(result.finalScore).toBe(100);
+      // With all components at 100 but GIVpower disabled (15%), the final score should be 85
+      // This is expected because GIVpower scoring is currently disabled and returns 0
+      expect(result.finalScore).toBe(85);
     });
   });
 });

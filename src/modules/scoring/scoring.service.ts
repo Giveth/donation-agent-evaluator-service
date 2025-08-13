@@ -201,6 +201,13 @@ ${twitterPosts.length > 0 ? JSON.stringify(twitterPosts, null, 2) : 'No recent T
 FARCASTER POSTS:
 ${farcasterPosts.length > 0 ? JSON.stringify(farcasterPosts, null, 2) : 'No recent Farcaster activity'}
 
+SCORING RUBRIC:
+- 80-100: Exceptional alignment/quality - directly supports cause mission with clear evidence
+- 60-79: Strong alignment/quality - closely matches cause goals with good evidence  
+- 40-59: Moderate alignment/quality - some connection but not perfectly aligned
+- 20-39: Weak alignment/quality - minimal connection or poor quality
+- 0-19: No meaningful alignment/quality - unrelated or very poor quality
+
 Please provide scores for:
 
 1. PROJECT INFO QUALITY (0-100): Evaluate the quality, completeness, and professionalism of the project description and updates. Consider clarity, detail, transparency, and communication quality.
@@ -211,15 +218,13 @@ Please provide scores for:
 
 4. FARCASTER QUALITY (0-100): Evaluate the quality of Farcaster content specifically. Consider engagement, professionalism, and value provided. If no Farcaster activity, score 0.
 
-5. RELEVANCE TO CAUSE (0-100): Overall relevance score (combination of project data(Project Description and LATEST UPDATE and Project Title), Twitter, and Farcaster) to the cause title, description, and all specified categories with their descriptions.
+5. RELEVANCE TO CAUSE (0-100): Overall relevance score (combination of project data and social media) to the cause title, description, and all specified categories with their descriptions.
 
-6. TWITTER RELEVANCE (0-100): Evaluate how well Twitter posts align with the cause's mission, goals, and specified categories. If no Twitter activity, score 0.
+6. SOCIAL MEDIA RELEVANCE (0-100): Evaluate how well ALL social media posts (Twitter + Farcaster combined) align with the cause's mission, goals, and specified categories. If no social media activity, score 0.
 
-7. FARCASTER RELEVANCE (0-100): Evaluate how well Farcaster posts align with the cause's mission, goals, and specified categories. If no Farcaster activity, score 0.
+7. PROJECT RELEVANCE (0-100): Evaluate how well the project information aligns with the cause's mission, goals, and specified categories based on project description and updates. Be generous with scoring if project genuinely works toward cause goals.
 
-8. PROJECT RELEVANCE (0-100): Evaluate how well the project information aligns with the cause's mission, goals, and specified categories based on project description and updates.
-
-9. EVIDENCE OF IMPACT (0-100): Evaluate evidence of social/environmental impact or philanthropic action demonstrated in project updates, Twitter posts, and Farcaster posts. Look for concrete examples of positive impact, beneficiaries helped, or meaningful change created.
+8. EVIDENCE OF IMPACT (0-100): Evaluate evidence of social/environmental impact or philanthropic action demonstrated in project updates, Twitter posts, and Farcaster posts. Look for concrete examples of positive impact, beneficiaries helped, or meaningful change created.
 
 Respond in JSON format:
 {
@@ -228,8 +233,7 @@ Respond in JSON format:
   "twitterQualityScore": <number>,
   "farcasterQualityScore": <number>,
   "relevanceToCauseScore": <number>,
-  "twitterRelevanceScore": <number>,
-  "farcasterRelevanceScore": <number>,
+  "socialMediaRelevanceScore": <number>,
   "projectRelevanceScore": <number>,
   "evidenceOfImpactScore": <number>,
   "projectInfoQualityReasoning": "<brief explanation>",
@@ -400,18 +404,16 @@ Respond in JSON format:
 
   /**
    * Calculate platform-specific relevance to cause score
-   * Twitter 33%, Farcaster 33%, Project 33%
+   * Social Media 50%, Project 50%
    */
   private calculatePlatformSpecificRelevanceScore(
     llmAssessment: LLMAssessmentDto,
   ): number {
-    const twitterWeight = 0.33;
-    const farcasterWeight = 0.33;
-    const projectWeight = 0.34; // 0.34 to ensure total is 1.0
+    const socialMediaWeight = 0.5;
+    const projectWeight = 0.5;
 
     const platformSpecificScore =
-      llmAssessment.twitterRelevanceScore * twitterWeight +
-      llmAssessment.farcasterRelevanceScore * farcasterWeight +
+      llmAssessment.socialMediaRelevanceScore * socialMediaWeight +
       llmAssessment.projectRelevanceScore * projectWeight;
 
     return Math.round(Math.max(0, Math.min(100, platformSpecificScore)));

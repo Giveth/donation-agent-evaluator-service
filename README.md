@@ -617,10 +617,10 @@ The service uses structured prompts to ensure consistent LLM evaluations:
 
 #### Relevance Scoring Methodology
 
-The **Relevance to Cause** component (25% of total score) uses an improved assessment approach:
+The **Relevance to Cause** component (25% of total score) uses a simplified, two-component assessment:
 
 - **Social Media Relevance (50%)**: Combined evaluation of all Twitter and Farcaster posts for cause alignment
-- **Project Data Relevance (50%)**: Assessment of project description, updates, and titles for cause alignment
+- **Project Relevance (50%)**: Assessment of project title, description, latest update title, and latest update content for cause alignment
 
 **Scoring Rubric:**
 - **80-100**: Exceptional alignment - directly supports cause mission with clear evidence

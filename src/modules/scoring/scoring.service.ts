@@ -101,7 +101,7 @@ export class ScoringService {
           input.socialPosts,
         ),
         relevanceToCauseScore:
-          this.calculatePlatformSpecificRelevanceScore(llmAssessment),
+          this.calculateCombinedRelevanceScore(llmAssessment),
         evidenceOfImpactScore: llmAssessment.evidenceOfImpactScore,
         givPowerRankScore: this.calculateGivPowerRankScore(
           input.givPowerRank,
@@ -218,13 +218,11 @@ Please provide scores for:
 
 4. FARCASTER QUALITY (0-100): Evaluate the quality of Farcaster content specifically. Consider engagement, professionalism, and value provided. If no Farcaster activity, score 0.
 
-5. RELEVANCE TO CAUSE (0-100): Overall relevance score (combination of project data and social media) to the cause title, description, and all specified categories with their descriptions.
+5. SOCIAL MEDIA RELEVANCE (0-100): Evaluate how well ALL social media posts (Twitter + Farcaster combined) align with the cause's mission, goals, and specified categories. If no social media activity, score 0.
 
-6. SOCIAL MEDIA RELEVANCE (0-100): Evaluate how well ALL social media posts (Twitter + Farcaster combined) align with the cause's mission, goals, and specified categories. If no social media activity, score 0.
+6. PROJECT RELEVANCE (0-100): Evaluate how well the project information aligns with the cause's mission, goals, and specified categories. Base your assessment on: project title, project description, latest update title, and latest update content. Be generous with scoring if project genuinely works toward cause goals.
 
-7. PROJECT RELEVANCE (0-100): Evaluate how well the project information aligns with the cause's mission, goals, and specified categories based on project description and updates. Be generous with scoring if project genuinely works toward cause goals.
-
-8. EVIDENCE OF IMPACT (0-100): Evaluate evidence of social/environmental impact or philanthropic action demonstrated in project updates, Twitter posts, and Farcaster posts. Look for concrete examples of positive impact, beneficiaries helped, or meaningful change created.
+7. EVIDENCE OF IMPACT (0-100): Evaluate evidence of social/environmental impact or philanthropic action demonstrated in project updates, Twitter posts, and Farcaster posts. Look for concrete examples of positive impact, beneficiaries helped, or meaningful change created.
 
 Respond in JSON format:
 {
@@ -232,13 +230,12 @@ Respond in JSON format:
   "socialMediaQualityScore": <number>,
   "twitterQualityScore": <number>,
   "farcasterQualityScore": <number>,
-  "relevanceToCauseScore": <number>,
   "socialMediaRelevanceScore": <number>,
   "projectRelevanceScore": <number>,
   "evidenceOfImpactScore": <number>,
   "projectInfoQualityReasoning": "<brief explanation>",
   "socialMediaQualityReasoning": "<brief explanation>",
-  "relevanceToCauseReasoning": "<brief explanation>",
+  "projectRelevanceReasoning": "<brief explanation>",
   "evidenceOfImpactReasoning": "<brief explanation>"
 }`;
 
@@ -403,20 +400,20 @@ Respond in JSON format:
   }
 
   /**
-   * Calculate platform-specific relevance to cause score
+   * Calculate combined relevance to cause score
    * Social Media 50%, Project 50%
    */
-  private calculatePlatformSpecificRelevanceScore(
+  private calculateCombinedRelevanceScore(
     llmAssessment: LLMAssessmentDto,
   ): number {
     const socialMediaWeight = 0.5;
     const projectWeight = 0.5;
 
-    const platformSpecificScore =
+    const combinedScore =
       llmAssessment.socialMediaRelevanceScore * socialMediaWeight +
       llmAssessment.projectRelevanceScore * projectWeight;
 
-    return Math.round(Math.max(0, Math.min(100, platformSpecificScore)));
+    return Math.round(Math.max(0, Math.min(100, combinedScore)));
   }
 
   /**

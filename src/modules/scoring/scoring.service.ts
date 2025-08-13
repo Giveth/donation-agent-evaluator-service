@@ -101,7 +101,7 @@ export class ScoringService {
           input.socialPosts,
         ),
         relevanceToCauseScore:
-          this.calculatePlatformSpecificRelevanceScore(llmAssessment),
+          this.calculateCombinedRelevanceScore(llmAssessment),
         evidenceOfImpactScore: llmAssessment.evidenceOfImpactScore,
         givPowerRankScore: this.calculateGivPowerRankScore(
           input.givPowerRank,
@@ -204,22 +204,53 @@ ${farcasterPosts.length > 0 ? JSON.stringify(farcasterPosts, null, 2) : 'No rece
 Please provide scores for:
 
 1. PROJECT INFO QUALITY (0-100): Evaluate the quality, completeness, and professionalism of the project description and updates. Consider clarity, detail, transparency, and communication quality.
+   SCORING RUBRIC:
+   - 80-100: Exceptional quality - very clear, detailed, professional, transparent
+   - 60-79: Strong quality - clear and well-structured with good detail
+   - 40-59: Moderate quality - adequate information but could be clearer
+   - 20-39: Weak quality - limited information, unclear or unprofessional
+   - 0-19: Poor quality - very limited, confusing, or unprofessional content
 
 2. SOCIAL MEDIA QUALITY (0-100): Overall social media content quality score (combination of Twitter and Farcaster).
+   SCORING RUBRIC:
+   - 80-100: Exceptional content - highly engaging, professional, valuable to followers
+   - 60-79: Strong content - good engagement, professional tone, informative
+   - 40-59: Moderate content - adequate posts but could be more engaging
+   - 20-39: Weak content - limited engagement, inconsistent quality
+   - 0-19: Poor content - low quality, irrelevant, or unprofessional posts
 
 3. TWITTER QUALITY (0-100): Evaluate the quality of Twitter content specifically. Consider engagement, professionalism, and value provided. If no Twitter activity, score 0.
 
 4. FARCASTER QUALITY (0-100): Evaluate the quality of Farcaster content specifically. Consider engagement, professionalism, and value provided. If no Farcaster activity, score 0.
 
-5. RELEVANCE TO CAUSE (0-100): Overall relevance score (combination of project data(Project Description and LATEST UPDATE and Project Title), Twitter, and Farcaster) to the cause title, description, and all specified categories with their descriptions.
+5. SOCIAL MEDIA RELEVANCE (0-100): Evaluate how well ALL social media posts (Twitter + Farcaster combined) align with the cause's goals or mission as stated in the cause description and the cause's categories. If no social media activity, score 0.
+   RELEVANCE SCORING RUBRIC:
+   - 80-100: Exceptional alignment - directly supports cause mission with clear evidence
+   - 60-79: Strong alignment - closely matches cause goals with good evidence  
+   - 40-59: Moderate alignment - some connection but not perfectly aligned
+   - 20-39: Weak alignment - minimal connection to cause
+   - 0-19: No meaningful alignment - unrelated to cause
 
-6. TWITTER RELEVANCE (0-100): Evaluate how well Twitter posts align with the cause's mission, goals, and specified categories. If no Twitter activity, score 0.
+6. PROJECT RELEVANCE (0-100): Evaluate how well the project information aligns with the cause's goals or mission as stated in the cause description and the causes's categories. Base your assessment on: project title, project description, latest update title, and latest update content. Be generous with scoring if project genuinely works toward cause goals.
+   RELEVANCE SCORING RUBRIC:
+   - 80-100: Exceptional alignment - directly supports cause mission with clear evidence
+   - 60-79: Strong alignment - closely matches cause goals with good evidence  
+   - 40-59: Moderate alignment - some connection but not perfectly aligned
+   - 20-39: Weak alignment - minimal connection to cause
+   - 0-19: No meaningful alignment - unrelated to cause
 
-7. FARCASTER RELEVANCE (0-100): Evaluate how well Farcaster posts align with the cause's mission, goals, and specified categories. If no Farcaster activity, score 0.
+7. EVIDENCE OF IMPACT (0–100): Evaluate the project’s demonstrated results and progress toward positive change included in their project updates, Twitter posts and/or Farcaster posts. Scope of impact includes:  
+- Social or environmental impact (measurable benefits to people, communities, or ecosystems).  
+- Philanthropic action (charitable activities, donations, volunteer initiatives).  
+- Mission-aligned action (contributions toward the goals or vision stated in the Cause description, even if not strictly social/environmental).  
 
-8. PROJECT RELEVANCE (0-100): Evaluate how well the project information aligns with the cause's mission, goals, and specified categories based on project description and updates.
+  EVIDENCE OF IMPACT SCORING RUBRIC:  
+  - 80–100: Exceptional impact – clear, documented, substantial evidence of positive change or mission advancement, strongly aligned with Cause goals.  
+  - 60–79: Strong impact – good evidence of meaningful results or mission-aligned contributions.  
+  - 40–59: Moderate impact – some evidence of positive change or alignment with Cause goals.  
+  - 20–39: Weak impact – minimal, vague, or indirect evidence of change or alignment.  
+  - 0–19: No meaningful impact – no evidence of positive change or mission advancement.  
 
-9. EVIDENCE OF IMPACT (0-100): Evaluate evidence of social/environmental impact or philanthropic action demonstrated in project updates, Twitter posts, and Farcaster posts. Look for concrete examples of positive impact, beneficiaries helped, or meaningful change created.
 
 Respond in JSON format:
 {
@@ -227,14 +258,12 @@ Respond in JSON format:
   "socialMediaQualityScore": <number>,
   "twitterQualityScore": <number>,
   "farcasterQualityScore": <number>,
-  "relevanceToCauseScore": <number>,
-  "twitterRelevanceScore": <number>,
-  "farcasterRelevanceScore": <number>,
+  "socialMediaRelevanceScore": <number>,
   "projectRelevanceScore": <number>,
   "evidenceOfImpactScore": <number>,
   "projectInfoQualityReasoning": "<brief explanation>",
   "socialMediaQualityReasoning": "<brief explanation>",
-  "relevanceToCauseReasoning": "<brief explanation>",
+  "projectRelevanceReasoning": "<brief explanation>",
   "evidenceOfImpactReasoning": "<brief explanation>"
 }`;
 
@@ -399,22 +428,20 @@ Respond in JSON format:
   }
 
   /**
-   * Calculate platform-specific relevance to cause score
-   * Twitter 33%, Farcaster 33%, Project 33%
+   * Calculate combined relevance to cause score
+   * Social Media 50%, Project 50%
    */
-  private calculatePlatformSpecificRelevanceScore(
+  private calculateCombinedRelevanceScore(
     llmAssessment: LLMAssessmentDto,
   ): number {
-    const twitterWeight = 0.33;
-    const farcasterWeight = 0.33;
-    const projectWeight = 0.34; // 0.34 to ensure total is 1.0
+    const socialMediaWeight = 0.5;
+    const projectWeight = 0.5;
 
-    const platformSpecificScore =
-      llmAssessment.twitterRelevanceScore * twitterWeight +
-      llmAssessment.farcasterRelevanceScore * farcasterWeight +
+    const combinedScore =
+      llmAssessment.socialMediaRelevanceScore * socialMediaWeight +
       llmAssessment.projectRelevanceScore * projectWeight;
 
-    return Math.round(Math.max(0, Math.min(100, platformSpecificScore)));
+    return Math.round(Math.max(0, Math.min(100, combinedScore)));
   }
 
   /**

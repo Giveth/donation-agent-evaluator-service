@@ -223,21 +223,21 @@ Please provide scores for:
 
 4. FARCASTER QUALITY (0-100): Evaluate the quality of Farcaster content specifically. Consider engagement, professionalism, and value provided. If no Farcaster activity, score 0.
 
-5. SOCIAL MEDIA RELEVANCE (0-100): Evaluate how well ALL social media posts (Twitter + Farcaster combined) align with the cause's goals or mission as stated in the cause description and the cause's categories. If no social media activity, score 0.
+5. SOCIAL MEDIA RELEVANCE (0-100): Evaluate how well ALL social media posts (Twitter + Farcaster combined) align with the cause's goals or mission as stated in the cause description and the cause's categories. If no social media activity, score 0. Base your assessment on: project title, project description, latest update title, and latest update content. Be generous with scoring if project genuinely works toward cause goals.
    RELEVANCE SCORING RUBRIC:
-   - 80-100: Exceptional alignment - directly supports cause mission with clear evidence
-   - 60-79: Strong alignment - closely matches cause goals with good evidence  
-   - 40-59: Moderate alignment - some connection but not perfectly aligned
-   - 20-39: Weak alignment - minimal connection to cause
-   - 0-19: No meaningful alignment - unrelated to cause
+   - 90-100: Exceptional alignment -the project clearly demonstrates alignment with the goals, mission or theme of the Cause, it performs activities that directly support the cause 
+   - 65-89: Strong alignment - several parts of the project align with the cause's goals, mission or theme it supports, it has activities that directly or indirectly support the cause 
+   - 40-64: Moderate alignment - the project is loosely aligned with the cause's goals, mission or theme it supports 
+   - 20-39: Weak alignment - the project has minimal connection to cause
+   - 0-19: No meaningful alignment - the project is unrelated to cause
 
 6. PROJECT RELEVANCE (0-100): Evaluate how well the project information aligns with the cause's goals or mission as stated in the cause description and the causes's categories. Base your assessment on: project title, project description, latest update title, and latest update content. Be generous with scoring if project genuinely works toward cause goals.
    RELEVANCE SCORING RUBRIC:
-   - 90-100: Exceptional alignment - a near perfect match with the goals, mission or theme of the Cause 
-   - 65-89: Strong alignment - closely matches cause goals, mission or theme it supports 
-   - 40-64: Moderate alignment - some connection but not perfectly aligned
-   - 20-39: Weak alignment - minimal connection to cause
-   - 0-19: No meaningful alignment - unrelated to cause
+   - 90-100: Exceptional alignment -the project clearly demonstrates alignment with the goals, mission or theme of the Cause, it performs activities that directly support the cause 
+   - 65-89: Strong alignment - several parts of the project align with the cause's goals, mission or theme it supports, it has activities that directly or indirectly support the cause 
+   - 40-64: Moderate alignment - the project is loosely aligned with the cause's goals, mission or theme it supports 
+   - 20-39: Weak alignment - the project has minimal connection to cause
+   - 0-19: No meaningful alignment - the project is unrelated to cause
 
 7. EVIDENCE OF IMPACT (0–100): Evaluate the project’s demonstrated results and progress toward positive change included in their project updates, Twitter posts and/or Farcaster posts. Scope of impact includes:  
 - Social or environmental impact (measurable benefits to people, communities, or ecosystems).  

@@ -588,7 +588,7 @@ The CauseScore is calculated using a weighted rubric totaling 100 points:
 | **Social Media Content Quality**            | 10%    | LLM-assessed   | Quality of social media posts (Twitter 50%, Farcaster 50%) |
 | **Social Media Posting Recency**            | 5%     | Calculated     | How recently social media was posted                       |
 | **Social Media Posting Frequency**          | 5%     | Calculated     | Frequency of social media activity                         |
-| **Relevance to Cause**                      | 25%    | LLM-assessed   | How well the project aligns with the cause theme           |
+| **Relevance to Cause**                      | 25%    | LLM-assessed   | How well the project aligns with the cause theme (Social Media 50%, Project Data 50%) |
 | **Evidence of Social/Environmental Impact** | 25%    | LLM-assessed   | Evidence of real-world impact                              |
 | **GIVpower Rank**                           | 15%    | From Giveth DB | Community-driven ranking metric                            |
 
@@ -612,8 +612,24 @@ const causeScore =
 The service uses structured prompts to ensure consistent LLM evaluations:
 
 - **Quality Assessment**: Evaluates content clarity, completeness, and professionalism
-- **Relevance Assessment**: Measures alignment with cause theme using keyword analysis and semantic understanding
+- **Relevance Assessment**: Measures alignment with cause theme using a 50/50 split between social media content and project data
 - **Impact Assessment**: Looks for concrete evidence of social/environmental benefits
+
+#### Relevance Scoring Methodology
+
+The **Relevance to Cause** component (25% of total score) uses a simplified, two-component assessment:
+
+- **Social Media Relevance (50%)**: Combined evaluation of all Twitter and Farcaster posts for cause alignment
+- **Project Relevance (50%)**: Assessment of project title, description, latest update title, and latest update content for cause alignment
+
+**Scoring Rubric:**
+- **80-100**: Exceptional alignment - directly supports cause mission with clear evidence
+- **60-79**: Strong alignment - closely matches cause goals with good evidence  
+- **40-59**: Moderate alignment - some connection but not perfectly aligned
+- **20-39**: Weak alignment - minimal connection or poor quality
+- **0-19**: No meaningful alignment - unrelated or very poor quality
+
+This approach ensures projects aren't unfairly penalized for limited social media presence while maintaining rigorous relevance standards.
 
 ## Setup & Development
 

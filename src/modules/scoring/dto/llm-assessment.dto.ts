@@ -42,31 +42,13 @@ export class LLMAssessmentDto {
   farcasterQualityScore!: number;
 
   /**
-   * Relevance to cause score (0-100)
-   * Evaluates how well the project aligns with the cause's mission and goals
+   * Social media relevance to cause score (0-100)
+   * Evaluates how well all social media posts (Twitter + Farcaster) align with the cause's mission
    */
   @IsNumber()
   @Min(0)
   @Max(100)
-  relevanceToCauseScore!: number;
-
-  /**
-   * Twitter relevance to cause score (0-100)
-   * Evaluates how well Twitter posts align with the cause's mission
-   */
-  @IsNumber()
-  @Min(0)
-  @Max(100)
-  twitterRelevanceScore!: number;
-
-  /**
-   * Farcaster relevance to cause score (0-100)
-   * Evaluates how well Farcaster posts align with the cause's mission
-   */
-  @IsNumber()
-  @Min(0)
-  @Max(100)
-  farcasterRelevanceScore!: number;
+  socialMediaRelevanceScore!: number;
 
   /**
    * Project data relevance to cause score (0-100)
@@ -101,11 +83,11 @@ export class LLMAssessmentDto {
   socialMediaQualityReasoning?: string;
 
   /**
-   * Optional reasoning for relevance to cause score
+   * Optional reasoning for project relevance score
    */
   @IsOptional()
   @IsString()
-  relevanceToCauseReasoning?: string;
+  projectRelevanceReasoning?: string;
 
   /**
    * Optional reasoning for evidence of impact score
@@ -127,14 +109,12 @@ export class LLMAssessmentDto {
       socialMediaQualityScore: 0,
       twitterQualityScore: 0,
       farcasterQualityScore: 0,
-      relevanceToCauseScore: 0,
-      twitterRelevanceScore: 0,
-      farcasterRelevanceScore: 0,
+      socialMediaRelevanceScore: 0,
       projectRelevanceScore: 0,
       evidenceOfImpactScore: 0,
       projectInfoQualityReasoning: 'LLM assessment failed',
       socialMediaQualityReasoning: 'LLM assessment failed',
-      relevanceToCauseReasoning: 'LLM assessment failed',
+      projectRelevanceReasoning: 'LLM assessment failed',
       evidenceOfImpactReasoning: 'LLM assessment failed',
     });
   }
@@ -147,9 +127,7 @@ export class LLMAssessmentDto {
     socialMediaScore: number,
     twitterQualityScore: number,
     farcasterQualityScore: number,
-    relevanceScore: number,
-    twitterRelevanceScore: number,
-    farcasterRelevanceScore: number,
+    socialMediaRelevanceScore: number,
     projectRelevanceScore: number,
     evidenceOfImpactScore: number,
   ): LLMAssessmentDto {
@@ -158,9 +136,7 @@ export class LLMAssessmentDto {
       socialMediaQualityScore: socialMediaScore,
       twitterQualityScore,
       farcasterQualityScore,
-      relevanceToCauseScore: relevanceScore,
-      twitterRelevanceScore,
-      farcasterRelevanceScore,
+      socialMediaRelevanceScore,
       projectRelevanceScore,
       evidenceOfImpactScore,
     });

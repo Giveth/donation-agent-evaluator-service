@@ -16,7 +16,10 @@ import { JobProcessorService } from '../services/job-processor.service';
 import { ProjectSyncProcessor } from '../processors/project-sync.processor';
 import { TwitterFetchProcessor } from '../processors/twitter-fetch.processor';
 import { FarcasterFetchProcessor } from '../processors/farcaster-fetch.processor';
-import { ProjectSocialAccountService } from '../../social-media-storage/services/project-social-account.service';
+import {
+  ProjectSocialAccountService,
+  ProjectAccountData,
+} from '../../social-media-storage/services/project-social-account.service';
 import { SocialPostStorageService } from '../../social-media-storage/services/social-post-storage.service';
 import {
   JobType,
@@ -757,6 +760,225 @@ export class AdminController {
         postsLast24Hours: 0,
         postsLast7Days: 0,
       };
+    }
+  }
+
+  /**
+   * Reset social media timestamps to trigger full re-fetch
+   *
+   * This endpoint is useful when:
+   * - Configuration changes require fetching more historical posts
+   * - Storage limits have been increased and need backfilling
+   * - Timestamps are corrupted or need to be reset
+   *
+   * Options:
+   * - platform: Reset only specific platform (twitter/farcaster) or both
+   * - minPostsThreshold: Only reset projects with fewer than X posts
+   * - maxAge: Only reset projects older than X days
+   * - clearPosts: Delete existing posts before reset (recommended for backfill)
+   */
+  @Post('reset-social-timestamps')
+  async resetSocialTimestamps(
+    @Query('platform') platform?: 'twitter' | 'farcaster',
+    @Query('minPostsThreshold') minPostsThreshold?: string,
+    @Query('maxAge') maxAge?: string,
+    @Query('projectId') projectId?: string,
+    @Query('clearPosts') clearPosts?: string,
+  ): Promise<{
+    success: boolean;
+    message: string;
+    data?: {
+      totalProjectsChecked: number;
+      projectsReset: number;
+      twitterTimestampsReset: number;
+      farcasterTimestampsReset: number;
+      resetProjects: Array<{
+        projectId: string;
+        platformsReset: string[];
+        currentPostCounts: {
+          twitter: number;
+          farcaster: number;
+        };
+      }>;
+    };
+  }> {
+    const correlationId = uuidv4();
+    this.logger.log(
+      `[${correlationId}] Reset social timestamps requested - Platform: ${platform ?? 'all'}, MinPosts: ${minPostsThreshold ?? 'none'}, MaxAge: ${maxAge ?? 'none'}, ProjectId: ${projectId ?? 'all'}, ClearPosts: ${clearPosts ?? 'false'}`,
+    );
+
+    try {
+      const minPosts = minPostsThreshold
+        ? parseInt(minPostsThreshold, 10)
+        : undefined;
+      const maxAgeDays = maxAge ? parseInt(maxAge, 10) : undefined;
+      const shouldClearPosts = clearPosts === 'true';
+
+      // Get all projects or specific project
+      const projects = projectId
+        ? [
+            await this.projectSocialAccountService.getProjectAccount(projectId),
+          ].filter(Boolean)
+        : await this.projectSocialAccountService.getProjectsForScheduling();
+
+      if (projects.length === 0) {
+        return {
+          success: false,
+          message: projectId
+            ? `Project ${projectId} not found`
+            : 'No projects found in the system',
+        };
+      }
+
+      const resetProjects: Array<{
+        projectId: string;
+        platformsReset: string[];
+        currentPostCounts: {
+          twitter: number;
+          farcaster: number;
+        };
+      }> = [];
+
+      let twitterTimestampsReset = 0;
+      let farcasterTimestampsReset = 0;
+
+      for (const project of projects) {
+        if (!project) continue; // Skip null projects
+
+        const platformsReset: string[] = [];
+
+        // Get current post counts for this project
+        const projectPosts =
+          await this.socialPostStorageService.getRecentSocialPosts(
+            project.projectId,
+            100, // Get up to 100 posts to count them
+          );
+        const twitterCount = projectPosts.filter(
+          p => p.platform === SocialMediaPlatform.TWITTER,
+        ).length;
+        const farcasterCount = projectPosts.filter(
+          p => p.platform === SocialMediaPlatform.FARCASTER,
+        ).length;
+
+        // Check if project meets reset criteria
+        let shouldResetTwitter = false;
+        let shouldResetFarcaster = false;
+
+        // Platform filter
+        if (!platform || platform === 'twitter') {
+          shouldResetTwitter = project.latestXPostTimestamp !== null;
+        }
+        if (!platform || platform === 'farcaster') {
+          shouldResetFarcaster = project.latestFarcasterPostTimestamp !== null;
+        }
+
+        // MinPosts threshold filter
+        if (minPosts !== undefined) {
+          const totalPosts = twitterCount + farcasterCount;
+          if (totalPosts >= minPosts) {
+            shouldResetTwitter = false;
+            shouldResetFarcaster = false;
+          }
+        }
+
+        // MaxAge filter
+        if (maxAgeDays !== undefined) {
+          const cutoffDate = new Date();
+          cutoffDate.setDate(cutoffDate.getDate() - maxAgeDays);
+
+          if (
+            project.latestXPostTimestamp &&
+            project.latestXPostTimestamp > cutoffDate
+          ) {
+            shouldResetTwitter = false;
+          }
+          if (
+            project.latestFarcasterPostTimestamp &&
+            project.latestFarcasterPostTimestamp > cutoffDate
+          ) {
+            shouldResetFarcaster = false;
+          }
+        }
+
+        // Clear existing posts if requested (to enable full backfill)
+        if (shouldClearPosts && (shouldResetTwitter || shouldResetFarcaster)) {
+          const deletedCount =
+            await this.socialPostStorageService.deletePostsForProject(
+              project.projectId,
+            );
+          this.logger.log(
+            `[${correlationId}] Cleared ${deletedCount} existing posts for project ${project.projectId} to enable full backfill`,
+          );
+        }
+
+        // Perform resets
+        const updateData: Partial<ProjectAccountData> = {};
+
+        if (shouldResetTwitter) {
+          updateData.latestXPostTimestamp = null;
+          platformsReset.push('twitter');
+          twitterTimestampsReset++;
+        }
+
+        if (shouldResetFarcaster) {
+          updateData.latestFarcasterPostTimestamp = null;
+          platformsReset.push('farcaster');
+          farcasterTimestampsReset++;
+        }
+
+        if (platformsReset.length > 0) {
+          await this.projectSocialAccountService.upsertProjectAccount(
+            project.projectId,
+            updateData,
+          );
+
+          resetProjects.push({
+            projectId: project.projectId,
+            platformsReset,
+            currentPostCounts: {
+              twitter: twitterCount,
+              farcaster: farcasterCount,
+            },
+          });
+
+          this.logger.log(
+            `[${correlationId}] Reset ${platformsReset.join(', ')} timestamps for project ${project.projectId}`,
+          );
+        }
+      }
+
+      const message = `Successfully reset timestamps for ${resetProjects.length} projects. Twitter: ${twitterTimestampsReset}, Farcaster: ${farcasterTimestampsReset}. Next scheduled fetch will retrieve historical posts.`;
+
+      this.logger.log(`[${correlationId}] ${message}`);
+
+      return {
+        success: true,
+        message,
+        data: {
+          totalProjectsChecked: projects.length,
+          projectsReset: resetProjects.length,
+          twitterTimestampsReset,
+          farcasterTimestampsReset,
+          resetProjects,
+        },
+      };
+    } catch (error: unknown) {
+      const errorMessage = `Failed to reset social timestamps: ${
+        error instanceof Error ? error.message : 'Unknown error'
+      }`;
+      this.logger.error(
+        `[${correlationId}] ${errorMessage}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+
+      throw new HttpException(
+        {
+          success: false,
+          message: errorMessage,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 }

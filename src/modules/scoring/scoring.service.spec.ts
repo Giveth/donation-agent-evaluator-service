@@ -19,8 +19,8 @@ describe('ScoringService', () => {
       const config: Record<string, any> = {
         SCORING_UPDATE_RECENCY_DECAY_DAYS: 30,
         SCORING_SOCIAL_RECENCY_DECAY_DAYS: 14,
-        SCORING_SOCIAL_FREQUENCY_DAYS: 30,
-        SCORING_MIN_POSTS_FOR_FULL_FREQUENCY: 8,
+        SCORING_SOCIAL_FREQUENCY_DAYS: 60,
+        SCORING_MIN_POSTS_FOR_FULL_FREQUENCY: 45,
       };
       return config[key] ?? defaultValue;
     }),
@@ -251,15 +251,15 @@ describe('ScoringService', () => {
     it('should calculate social media frequency score based on post count', async () => {
       const testCases = [
         { postCount: 0, expectedScore: 0 },
-        { postCount: 4, expectedScore: 50 }, // 4/8 = 50%
-        { postCount: 8, expectedScore: 100 }, // Full score at 8 posts
-        { postCount: 12, expectedScore: 100 }, // Capped at 100
+        { postCount: 23, expectedScore: 51 }, // 23/45 ≈ 51%
+        { postCount: 45, expectedScore: 100 }, // Full score at 45 posts
+        { postCount: 60, expectedScore: 100 }, // Capped at 100
       ];
 
       for (const { postCount, expectedScore } of testCases) {
         // Use recent dates within the frequency period
         const recentDate = new Date();
-        recentDate.setDate(recentDate.getDate() - 15); // 15 days ago, within 30-day window
+        recentDate.setDate(recentDate.getDate() - 30); // 30 days ago, within 60-day window
 
         const posts = Array.from({ length: postCount }, (_, i) => ({
           id: `${i}`,
@@ -377,7 +377,7 @@ describe('ScoringService', () => {
         givPowerRank: 1,
         totalProjectCount: 1000,
         lastUpdateDate: new Date(),
-        socialPosts: Array.from({ length: 10 }, (_, i) => ({
+        socialPosts: Array.from({ length: 45 }, (_, i) => ({
           id: `${i}`,
           text: `Post ${i}`,
           createdAt: new Date(),

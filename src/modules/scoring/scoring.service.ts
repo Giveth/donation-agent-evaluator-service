@@ -44,12 +44,12 @@ export class ScoringService {
 
     this.socialFrequencyDays = this.configService.get<number>(
       'SCORING_SOCIAL_FREQUENCY_DAYS',
-      30, // Default: Consider posts from last 30 days
+      60, // Default: Consider posts from last 60 days
     );
 
     this.minPostsForFullFrequencyScore = this.configService.get<number>(
       'SCORING_MIN_POSTS_FOR_FULL_FREQUENCY',
-      8, // Default: 8 posts in 30 days for full score
+      45, // Default: 45 posts in 60 days for full score
     );
 
     this.logger.log(

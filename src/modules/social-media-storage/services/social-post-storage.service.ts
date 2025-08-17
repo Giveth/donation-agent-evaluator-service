@@ -1215,4 +1215,47 @@ export class SocialPostStorageService {
       this.logger.error('Failed to release distributed lock:', error);
     }
   }
+
+  /**
+   * Delete all social posts for a specific project
+   * Used for resetting project social media data during configuration transitions
+   * 
+   * @param projectId - The project ID to delete posts for
+   * @returns Promise<number> - Number of deleted posts
+   */
+  async deletePostsForProject(projectId: string): Promise<number> {
+    try {
+      // Get project account first
+      const projectAccount = await this.projectAccountRepository.findOne({
+        where: { projectId },
+      });
+
+      if (!projectAccount) {
+        this.logger.debug(`No project account found for project ${projectId}`);
+        return 0;
+      }
+
+      // Delete all posts for this project
+      const result = await this.storedSocialPostRepository
+        .createQueryBuilder()
+        .delete()
+        .where('projectAccountId = :projectAccountId', {
+          projectAccountId: projectAccount.id,
+        })
+        .execute();
+
+      const deletedCount = result.affected || 0;
+      this.logger.log(
+        `Deleted ${deletedCount} social posts for project ${projectId}`,
+      );
+
+      return deletedCount;
+    } catch (error) {
+      this.logger.error(
+        `Failed to delete posts for project ${projectId}:`,
+        error,
+      );
+      throw error;
+    }
+  }
 }

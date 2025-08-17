@@ -72,7 +72,7 @@ export class FarcasterService {
       maxRetries: this.configService.get<number>('FARCASTER_MAX_RETRIES', 3),
       lookbackDays: this.configService.get<number>(
         'FARCASTER_POSTS_LOOKBACK_DAYS',
-        90,
+        60,
       ),
       maxPostsPerProject: this.configService.get<number>(
         'FARCASTER_MAX_POSTS_PER_PROJECT',

@@ -63,6 +63,9 @@ export class TwitterService {
   private readonly baseRetryDelay: number;
   private lastRequestTime: number = 0;
 
+  // Posts configuration
+  private readonly postsLookbackDays: number;
+
   // Twitter account credentials
   private readonly account1: {
     username: string | undefined;
@@ -97,6 +100,10 @@ export class TwitterService {
     this.baseRetryDelay =
       this.configService.get<number>('TWITTER_BASE_RETRY_DELAY_MS') ?? 5000; // 5 seconds
 
+    // Posts configuration
+    this.postsLookbackDays =
+      this.configService.get<number>('TWITTER_POSTS_LOOKBACK_DAYS') ?? 60; // 60 days
+
     // Initialize Twitter account credentials
     this.account1 = {
       username: this.configService.get<string>('TWITTER_USERNAME'),
@@ -111,6 +118,9 @@ export class TwitterService {
 
     this.logger.log(
       `TwitterService initialized with rate limiting: ${this.minDelayBetweenRequests}-${this.maxDelayBetweenRequests}ms delays, ${this.maxRetries} retries`,
+    );
+    this.logger.log(
+      `Twitter posts configuration: ${this.postsLookbackDays} days lookback`,
     );
     this.logger.log(
       `Available Twitter accounts: Account1=${this.hasValidCredentials(this.account1) ? '✓' : '❌'}, Account2=${this.hasValidCredentials(this.account2) ? '✓' : '❌'}`,
@@ -560,7 +570,7 @@ export class TwitterService {
     // Fetch tweets using the scraper
     const tweets: Tweet[] = [];
     const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - 90); // 90 days ago
+    cutoffDate.setDate(cutoffDate.getDate() - this.postsLookbackDays);
 
     // Get tweets from the user's timeline
     let count = 0;
@@ -588,13 +598,13 @@ export class TwitterService {
         continue;
       }
 
-      // Filter tweets from last 90 days
+      // Filter tweets from last N days (configurable)
       if (tweet.timeParsed && tweet.timeParsed >= cutoffDate) {
         tweets.push(tweet);
       } else if (tweet.timeParsed && tweet.timeParsed < cutoffDate) {
         // Skip old tweets but don't break immediately as there might be more recent tweets
         this.logger.debug(
-          `${cleanHandle} - Tweet ${tweet.id} is older than 90 days, skipping`,
+          `${cleanHandle} - Tweet ${tweet.id} is older than ${this.postsLookbackDays} days, skipping`,
         );
       } else {
         this.logger.debug(
@@ -1067,9 +1077,9 @@ export class TwitterService {
       // Fetch tweets using the scraper with incremental logic
       const tweets: Tweet[] = [];
       const cutoffDate = new Date();
-      cutoffDate.setDate(cutoffDate.getDate() - 90); // 90 days ago
+      cutoffDate.setDate(cutoffDate.getDate() - this.postsLookbackDays);
 
-      // Use the more restrictive date (either 90 days ago or sinceTimestamp)
+      // Use the more restrictive date (either lookback days or sinceTimestamp)
       const effectiveCutoffDate =
         sinceTimestamp && sinceTimestamp > cutoffDate
           ? sinceTimestamp

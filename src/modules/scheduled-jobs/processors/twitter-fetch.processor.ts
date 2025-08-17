@@ -80,6 +80,17 @@ export class TwitterFetchProcessor {
         throw new Error(errorMsg);
       }
 
+      // Extract and log the clean username that will be used for scraping
+      const cleanUsername = projectAccount.xUrl
+        .replace(/^https:\/\/(twitter\.com|x\.com)\//, '')
+        .replace(/^@/, '');
+      // TODO: Remove after fixing the social media data not updating issue
+      this.logger.log(
+        `Processing Twitter fetch for project ${projectId}: ` +
+          `raw URL/handle="${projectAccount.xUrl}", ` +
+          `extracted username="${cleanUsername}"`,
+      );
+
       // Step 2: Get the latest Twitter post timestamp for incremental fetching
       const latestTimestamp = projectAccount.latestXPostTimestamp;
 
@@ -126,6 +137,14 @@ export class TwitterFetchProcessor {
           projectId,
           tweets,
         );
+
+      // TODO: Remove after fixing the social media data not updating issue
+      this.logger.log(
+        `Storage result for ${projectAccount.xUrl}: ` +
+          `${storageResult.stored} tweets stored, ` +
+          `duplicates found: ${storageResult.duplicatesFound}, ` +
+          `stopped at timestamp: ${storageResult.stoppedAtTimestamp?.toISOString() ?? 'none'}`,
+      );
 
       // Step 5: Update project account with fetch results
       const now = new Date();

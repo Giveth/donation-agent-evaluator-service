@@ -1094,8 +1094,20 @@ export class TwitterService {
       let stoppedDueToOldTweet = false;
       let skippedPinnedTweets = 0;
 
+      // TODO: Remove after fixing the social media data not updating issue
+      this.logger.log(
+        `${username} - Starting incremental tweet scraping with max 30 iterations`,
+      );
+
       for await (const tweet of this.scraper.getTweets(username, 30)) {
         count++;
+
+        // TODO: Remove after fixing the social media data not updating issue
+        this.logger.debug(
+          `${username} - Processing tweet #${count}: ID=${tweet.id}, ` +
+            `timestamp=${tweet.timeParsed?.toISOString() ?? 'NO_TIMESTAMP'}, ` +
+            `isPin=${tweet.isPin}, text="${tweet.text?.substring(0, 50)}..."`,
+        );
 
         // Check if we've hit our limits
         if (tweets.length >= 10) {
@@ -1152,6 +1164,14 @@ export class TwitterService {
           );
         }
       }
+
+      // TODO: Remove after fixing the social media data not updating issue
+      this.logger.log(
+        `${username} - Finished scraping: processed ${count} tweets, ` +
+          `collected ${tweets.length} valid tweets, ` +
+          `stopped due to old tweet: ${stoppedDueToOldTweet}, ` +
+          `skipped pinned tweets: ${skippedPinnedTweets}`,
+      );
 
       // Filter out pure retweets but keep quote tweets and originals
       const filteredTweets = tweets.filter(tweet => {

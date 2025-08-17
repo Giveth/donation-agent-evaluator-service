@@ -1099,8 +1099,19 @@ export class TwitterService {
         `${username} - Starting incremental tweet scraping with max 30 iterations`,
       );
 
-      for await (const tweet of this.scraper.getTweets(username, 30)) {
+      const tweetIterator = this.scraper.getTweets(username, 30);
+      // TODO: Remove after fixing the social media data not updating issue
+      this.logger.log(
+        `${username} - Created tweet iterator, starting iteration...`,
+      );
+
+      for await (const tweet of tweetIterator) {
         count++;
+
+        // TODO: Remove after fixing the social media data not updating issue
+        if (count === 1) {
+          this.logger.log(`${username} - First tweet received from scraper!`);
+        }
 
         // TODO: Remove after fixing the social media data not updating issue
         this.logger.debug(
@@ -1164,6 +1175,9 @@ export class TwitterService {
           );
         }
       }
+
+      // TODO: Remove after fixing the social media data not updating issue
+      this.logger.log(`${username} - Exited tweet iterator loop`);
 
       // TODO: Remove after fixing the social media data not updating issue
       this.logger.log(

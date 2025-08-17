@@ -59,8 +59,8 @@ The evaluation uses 8 weighted criteria totaling 100% (`scoring.service.ts:394-4
 ### 5. Social Media Posting Frequency (5%)
 **File**: `scoring.service.ts:314-330`
 - **Assessment**: Linear scoring based on post count
-- **Period**: Last 30 days
-- **Formula**: `(postCount / 8) * 100` (8 posts = 100% score)
+- **Period**: Last 60 days
+- **Formula**: `(postCount / 45) * 100` (45 posts = 100% score)
 - **Score Range**: 0-100
 
 ### 6. Relevance to Cause (20%)
@@ -122,8 +122,8 @@ SCORING_WEIGHT_GIVPOWER_RANK=15            # Default: 15%
 ```bash
 SCORING_UPDATE_RECENCY_DECAY_DAYS=30       # Default: 30 days for 50% score
 SCORING_SOCIAL_RECENCY_DECAY_DAYS=14       # Default: 14 days for 50% score
-SCORING_SOCIAL_FREQUENCY_DAYS=30           # Default: Consider last 30 days
-SCORING_MIN_POSTS_FOR_FULL_FREQUENCY=8    # Default: 8 posts for 100% score
+SCORING_SOCIAL_FREQUENCY_DAYS=60           # Default: Consider last 60 days
+SCORING_MIN_POSTS_FOR_FULL_FREQUENCY=45   # Default: 45 posts for 100% score
 ```
 
 ## Error Handling Strategy

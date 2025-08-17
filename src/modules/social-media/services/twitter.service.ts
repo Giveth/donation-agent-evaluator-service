@@ -65,6 +65,7 @@ export class TwitterService {
 
   // Posts configuration
   private readonly postsLookbackDays: number;
+  private readonly maxTweetsToCollect: number;
 
   // Twitter account credentials
   private readonly account1: {
@@ -103,6 +104,8 @@ export class TwitterService {
     // Posts configuration
     this.postsLookbackDays =
       this.configService.get<number>('TWITTER_POSTS_LOOKBACK_DAYS') ?? 60; // 60 days
+    this.maxTweetsToCollect =
+      this.configService.get<number>('TWITTER_MAX_TWEETS_TO_COLLECT') ?? 50; // Collect and fetch up to 50 tweets
 
     // Initialize Twitter account credentials
     this.account1 = {
@@ -120,7 +123,9 @@ export class TwitterService {
       `TwitterService initialized with rate limiting: ${this.minDelayBetweenRequests}-${this.maxDelayBetweenRequests}ms delays, ${this.maxRetries} retries`,
     );
     this.logger.log(
-      `Twitter posts configuration: ${this.postsLookbackDays} days lookback`,
+      `Twitter posts configuration: ${this.postsLookbackDays} days lookback, ` +
+        `max ${this.maxTweetsToCollect} tweets per fetch, ` +
+        `collect up to ${this.maxTweetsToCollect} tweets`,
     );
     this.logger.log(
       `Available Twitter accounts: Account1=${this.hasValidCredentials(this.account1) ? '✓' : '❌'}, Account2=${this.hasValidCredentials(this.account2) ? '✓' : '❌'}`,
@@ -574,10 +579,13 @@ export class TwitterService {
 
     // Get tweets from the user's timeline
     let count = 0;
-    for await (const tweet of this.scraper.getTweets(cleanHandle, 15)) {
-      // Fetch up to 15 to have buffer for filtering
+    for await (const tweet of this.scraper.getTweets(
+      cleanHandle,
+      this.maxTweetsToCollect,
+    )) {
+      // Fetch configurable number of tweets to have buffer for filtering (need 45+ for full score)
       // Stop if we have enough tweets or if tweet is too old
-      if (tweets.length >= 10) {
+      if (tweets.length >= this.maxTweetsToCollect) {
         break;
       }
 
@@ -613,7 +621,7 @@ export class TwitterService {
       }
 
       count++;
-      if (count >= 15) break; // Safety limit
+      if (count >= this.maxTweetsToCollect) break; // Safety limit
     }
 
     // Filter out pure retweets but keep quote tweets and originals
@@ -1096,10 +1104,13 @@ export class TwitterService {
 
       // TODO: Remove after fixing the social media data not updating issue
       this.logger.log(
-        `${username} - Starting incremental tweet scraping with max 30 iterations`,
+        `${username} - Starting incremental tweet scraping with max ${this.maxTweetsToCollect} iterations`,
       );
 
-      const tweetIterator = this.scraper.getTweets(username, 30);
+      const tweetIterator = this.scraper.getTweets(
+        username,
+        this.maxTweetsToCollect,
+      );
       // TODO: Remove after fixing the social media data not updating issue
       this.logger.log(
         `${username} - Created tweet iterator, starting iteration...`,
@@ -1121,16 +1132,16 @@ export class TwitterService {
         );
 
         // Check if we've hit our limits
-        if (tweets.length >= 10) {
+        if (tweets.length >= this.maxTweetsToCollect) {
           this.logger.debug(
-            `${username} - Reached 10 tweets limit (incremental)`,
+            `${username} - Reached ${this.maxTweetsToCollect} tweets limit (incremental)`,
           );
           break;
         }
 
-        if (count >= 30) {
+        if (count >= this.maxTweetsToCollect) {
           this.logger.debug(
-            `${username} - Reached safety limit of 30 iterations (incremental)`,
+            `${username} - Reached safety limit of ${this.maxTweetsToCollect} iterations (incremental)`,
           );
           break;
         }

@@ -91,6 +91,10 @@ TWITTER_MAX_DELAY_MS=8000
 TWITTER_MAX_RETRIES=3
 TWITTER_BASE_RETRY_DELAY_MS=5000
 
+# Twitter Fetch Limits
+TWITTER_POSTS_LOOKBACK_DAYS=60         # Days to look back for posts
+TWITTER_MAX_TWEETS_TO_COLLECT=50       # Maximum tweets to collect and store
+
 # Farcaster Integration (FREE - No API Keys Required)
 # Uses FName Registry and Warpcast APIs - completely free
 
@@ -101,6 +105,14 @@ LLM_MODEL=google/gemini-2.5-flash
 # Giveth Backend Integration
 GIVETH_API_BASE_URL=https://api.giveth.io
 GIVETH_API_KEY=your_giveth_key
+
+# Social Media Storage Configuration
+SOCIAL_POST_MAX_COUNT=50       # Max social posts to keep per project
+SOCIAL_POST_MAX_AGE_DAYS=90    # Days to retain social posts
+
+# Social media frequency scoring configuration
+SCORING_SOCIAL_FREQUENCY_DAYS=60           # Days to consider for frequency calculation
+SCORING_MIN_POSTS_FOR_FULL_FREQUENCY=45   # Min posts for full frequency score
 
 # Scoring Weight Configuration (Optional - defaults are used if not specified)
 SCORING_WEIGHT_PROJECT_INFO_QUALITY=10

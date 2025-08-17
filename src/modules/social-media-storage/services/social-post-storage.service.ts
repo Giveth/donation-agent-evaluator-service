@@ -1131,7 +1131,7 @@ export class SocialPostStorageService {
     try {
       const now = new Date();
       const expiresAt = new Date(now.getTime() + timeoutMs);
-      const lockJobType = `LOCK_${lockKey}` as any; // Cast to bypass enum restriction
+      const lockJobType = `LOCK_${lockKey}` as 'PROJECT_SYNC'; // Cast to bypass enum restriction
 
       // Try to insert lock record using QueryBuilder with conflict handling
       const insertResult = await queryRunner.manager
@@ -1142,7 +1142,7 @@ export class SocialPostStorageService {
           projectId: 'SYSTEM_LOCK',
           jobType: lockJobType,
           scheduledFor: now,
-          status: 'PROCESSING' as any, // Processing indicates lock is active
+          status: 'processing', // Processing indicates lock is active
           metadata: { lockKey, expiresAt },
           createdAt: now,
           updatedAt: now,
@@ -1164,10 +1164,12 @@ export class SocialPostStorageService {
         .getRawOne();
 
       if (existingLock) {
-        const lockTime = new Date(existingLock.job_created_at);
-        const metadata = existingLock.job_metadata as { expiresAt?: string };
+        const lockTime = new Date(existingLock.job_created_at as string);
+        const metadata = existingLock.job_metadata as {
+          expiresAt?: string;
+        } | null;
 
-        if (metadata.expiresAt && new Date(metadata.expiresAt) < now) {
+        if (metadata?.expiresAt && new Date(metadata.expiresAt) < now) {
           // Lock expired, try to acquire it
           const updateResult = await queryRunner.manager
             .createQueryBuilder()
@@ -1204,7 +1206,7 @@ export class SocialPostStorageService {
    */
   private async releaseDistributedLock(lockKey: string): Promise<void> {
     try {
-      const lockJobType = `LOCK_${lockKey}` as any; // Cast to bypass enum restriction
+      const lockJobType = `LOCK_${lockKey}` as 'PROJECT_SYNC'; // Cast to bypass enum restriction
       await this.dataSource.manager
         .createQueryBuilder()
         .delete()
@@ -1219,7 +1221,6 @@ export class SocialPostStorageService {
   /**
    * Delete all social posts for a specific project
    * Used for resetting project social media data during configuration transitions
-   * 
    * @param projectId - The project ID to delete posts for
    * @returns Promise<number> - Number of deleted posts
    */
@@ -1244,7 +1245,7 @@ export class SocialPostStorageService {
         })
         .execute();
 
-      const deletedCount = result.affected || 0;
+      const deletedCount = result.affected ?? 0;
       this.logger.log(
         `Deleted ${deletedCount} social posts for project ${projectId}`,
       );

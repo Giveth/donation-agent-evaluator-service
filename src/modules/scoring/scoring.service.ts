@@ -23,6 +23,7 @@ export class ScoringService {
   private readonly socialRecencyDecayDays: number;
   private readonly socialFrequencyDays: number;
   private readonly minPostsForFullFrequencyScore: number;
+  private readonly maxPostsForLLMAssessment: number;
 
   constructor(
     private readonly configService: ConfigService,
@@ -50,6 +51,11 @@ export class ScoringService {
     this.minPostsForFullFrequencyScore = this.configService.get<number>(
       'SCORING_MIN_POSTS_FOR_FULL_FREQUENCY',
       45, // Default: 45 posts in 60 days for full score
+    );
+
+    this.maxPostsForLLMAssessment = this.configService.get<number>(
+      'SOCIAL_POST_MAX_COUNT',
+      50, // Default: Use all stored posts for LLM assessment
     );
 
     this.logger.log(
@@ -149,7 +155,7 @@ export class ScoringService {
     try {
       // Prepare social media content for assessment
       const recentPosts = input.socialPosts
-        .slice(0, 10) // Limit to 10 most recent posts
+        .slice(0, this.maxPostsForLLMAssessment) // Use configurable limit for LLM assessment
         .map(post => ({
           platform: post.platform,
           content: post.text,

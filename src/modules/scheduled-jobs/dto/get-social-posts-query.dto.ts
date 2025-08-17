@@ -29,14 +29,15 @@ export class GetSocialPostsQueryDto {
 
   /**
    * Maximum number of posts per project per platform
-   * @example 5
+   * Defaults to SOCIAL_POST_MAX_COUNT (50) if not specified
+   * @example 20
    */
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
   @Max(50)
-  limit?: number = 10;
+  limit?: number;
 
   /**
    * Helper method to get parsed project IDs array

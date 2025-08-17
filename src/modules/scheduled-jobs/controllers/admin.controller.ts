@@ -10,6 +10,7 @@ import {
   ValidationPipe,
   UsePipes,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { v4 as uuidv4 } from 'uuid';
 import { JobSchedulerService } from '../services/job-scheduler.service';
 import { JobProcessorService } from '../services/job-processor.service';
@@ -53,6 +54,7 @@ export class AdminController {
     private readonly farcasterFetchProcessor: FarcasterFetchProcessor,
     private readonly projectSocialAccountService: ProjectSocialAccountService,
     private readonly socialPostStorageService: SocialPostStorageService,
+    private readonly configService: ConfigService,
   ) {}
 
   /**
@@ -654,11 +656,15 @@ export class AdminController {
       }
 
       // Retrieve social posts for multiple projects
+      const defaultLimit = parseInt(
+        this.configService.get('SOCIAL_POST_MAX_COUNT', '50'),
+        10,
+      );
       const result =
         await this.socialPostStorageService.getSocialPostsForMultipleProjects(
           projectIds,
           query.platform,
-          query.limit ?? 10,
+          query.limit ?? defaultLimit,
         );
 
       const responseTime = Date.now() - startTime;

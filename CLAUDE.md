@@ -107,7 +107,7 @@ GIVETH_API_BASE_URL=https://api.giveth.io
 GIVETH_API_KEY=your_giveth_key
 
 # Social Media Storage Configuration
-SOCIAL_POST_MAX_COUNT=50       # Max social posts to keep per project
+SOCIAL_POST_MAX_COUNT=50       # Max social posts to keep per project (also used as default limit for admin API viewing)
 SOCIAL_POST_MAX_AGE_DAYS=90    # Days to retain social posts
 
 # Social media frequency scoring configuration

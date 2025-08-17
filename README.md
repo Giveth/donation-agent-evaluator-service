@@ -427,6 +427,89 @@ curl "https://staging.eval.ads.giveth.io/admin/social-posts?projectIds=project1,
 curl "https://staging.eval.ads.giveth.io/admin/social-posts?projectIds=project1&platform=farcaster&limit=10"
 ```
 
+#### `POST /admin/reset-social-timestamps`
+
+Reset social media timestamps to trigger full historical re-fetch of posts. This endpoint is essential when:
+- Configuration changes require fetching more historical posts (e.g., extending from 30-day to 60-day evaluation periods)
+- Storage limits have been increased and need backfilling
+- Timestamps are corrupted or need to be reset
+- Transitioning to new scoring requirements
+
+**Query Parameters (all optional):**
+
+- `platform` (string, optional): Reset only specific platform (`twitter` or `farcaster`), or both if omitted
+- `minPostsThreshold` (number, optional): Only reset projects with fewer than X posts
+- `maxAge` (number, optional): Only reset projects older than X days
+- `projectId` (string, optional): Reset only a specific project ID
+- `clearPosts` (boolean, optional): Delete existing posts before reset to enable full backfill (`true`/`false`, default: `false`)
+
+**⚠️ Important Notes:**
+- **Data Impact**: Using `clearPosts=true` will delete existing social media posts to enable proper historical backfill
+- **Scoring Impact**: Projects will have incomplete scores until historical data is re-fetched
+- **Production Use**: Schedule during maintenance windows as background jobs will be affected
+- **Backfill Strategy**: Use `clearPosts=true` to ensure complete 60-day historical data for new scoring requirements
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Successfully reset timestamps for 145 projects. Twitter: 98, Farcaster: 67. Next scheduled fetch will retrieve historical posts.",
+  "data": {
+    "totalProjectsChecked": 1247,
+    "projectsReset": 145,
+    "twitterTimestampsReset": 98,
+    "farcasterTimestampsReset": 67,
+    "resetProjects": [
+      {
+        "projectId": "project-123",
+        "platformsReset": ["twitter", "farcaster"],
+        "currentPostCounts": {
+          "twitter": 12,
+          "farcaster": 8
+        }
+      }
+    ]
+  }
+}
+```
+
+**Sample cURL Requests:**
+
+```bash
+# Reset all projects with full backfill (recommended for config changes)
+curl -X POST "https://staging.eval.ads.giveth.io/admin/reset-social-timestamps?clearPosts=true"
+
+# Reset only Twitter timestamps
+curl -X POST "https://staging.eval.ads.giveth.io/admin/reset-social-timestamps?platform=twitter"
+
+# Reset only projects with fewer than 45 posts (new requirement threshold)
+curl -X POST "https://staging.eval.ads.giveth.io/admin/reset-social-timestamps?minPostsThreshold=45&clearPosts=true"
+
+# Reset a specific project
+curl -X POST "https://staging.eval.ads.giveth.io/admin/reset-social-timestamps?projectId=project-123&clearPosts=true"
+
+# Reset projects older than 30 days with full backfill
+curl -X POST "https://staging.eval.ads.giveth.io/admin/reset-social-timestamps?maxAge=30&clearPosts=true"
+```
+
+**Common Use Cases:**
+
+1. **Configuration Migration (Recommended)**: When updating from 30-day to 60-day scoring periods:
+   ```bash
+   curl -X POST "https://staging.eval.ads.giveth.io/admin/reset-social-timestamps?clearPosts=true"
+   ```
+
+2. **Selective Reset**: Only reset projects that don't meet new requirements:
+   ```bash
+   curl -X POST "https://staging.eval.ads.giveth.io/admin/reset-social-timestamps?minPostsThreshold=45&clearPosts=true"
+   ```
+
+3. **Platform-Specific Reset**: Reset only Twitter or Farcaster:
+   ```bash
+   curl -X POST "https://staging.eval.ads.giveth.io/admin/reset-social-timestamps?platform=twitter&clearPosts=true"
+   ```
+
 ### Utility Endpoints
 
 #### `GET /`
@@ -1056,6 +1139,9 @@ curl "https://staging.eval.ads.giveth.io/admin/social-posts?projectIds=project1,
 
 # Force social media fetch for a project
 curl -X POST https://staging.eval.ads.giveth.io/admin/fetch/PROJECT_ID
+
+# Reset social media timestamps for configuration changes
+curl -X POST "https://staging.eval.ads.giveth.io/admin/reset-social-timestamps?clearPosts=true"
 
 # Get evaluation detailed report
 curl https://staging.eval.ads.giveth.io/evaluate/evaluation-detailed

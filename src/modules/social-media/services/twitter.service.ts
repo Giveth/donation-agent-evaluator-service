@@ -1116,75 +1116,88 @@ export class TwitterService {
         `${username} - Created tweet iterator, starting iteration...`,
       );
 
-      for await (const tweet of tweetIterator) {
-        count++;
+      // TODO: Remove after fixing the social media data not updating issue
+      this.logger.log(
+        `${username} - Starting to await tweets from iterator...`,
+      );
 
-        // TODO: Remove after fixing the social media data not updating issue
-        if (count === 1) {
-          this.logger.log(`${username} - First tweet received from scraper!`);
-        }
+      try {
+        for await (const tweet of tweetIterator) {
+          count++;
 
-        // TODO: Remove after fixing the social media data not updating issue
-        this.logger.debug(
-          `${username} - Processing tweet #${count}: ID=${tweet.id}, ` +
-            `timestamp=${tweet.timeParsed?.toISOString() ?? 'NO_TIMESTAMP'}, ` +
-            `isPin=${tweet.isPin}, text="${tweet.text?.substring(0, 50)}..."`,
-        );
-
-        // Check if we've hit our limits
-        if (tweets.length >= this.maxTweetsToCollect) {
-          this.logger.debug(
-            `${username} - Reached ${this.maxTweetsToCollect} tweets limit (incremental)`,
-          );
-          break;
-        }
-
-        if (count >= this.maxTweetsToCollect) {
-          this.logger.debug(
-            `${username} - Reached safety limit of ${this.maxTweetsToCollect} iterations (incremental)`,
-          );
-          break;
-        }
-
-        // Skip pinned tweets unless they meet our date criteria
-        // Pinned tweets can be old and break chronological order
-        if (tweet.isPin) {
-          // Only include pinned tweets if they're within our date range
-          if (tweet.timeParsed && tweet.timeParsed >= effectiveCutoffDate) {
-            this.logger.debug(
-              `${username} - Including pinned tweet ${tweet.id} from ${tweet.timeParsed.toISOString()} (within date range)`,
-            );
-            tweets.push(tweet);
-          } else {
-            this.logger.debug(
-              `${username} - Skipping pinned tweet ${tweet.id} (outside date range or no timestamp)`,
-            );
-            skippedPinnedTweets++;
+          // TODO: Remove after fixing the social media data not updating issue
+          if (count === 1) {
+            this.logger.log(`${username} - First tweet received from scraper!`);
           }
-          continue;
-        }
 
-        // Check if tweet is too old - STOP SCRAPING if we hit the cutoff
-        // This is the key incremental fetching logic
-        if (tweet.timeParsed && tweet.timeParsed < effectiveCutoffDate) {
-          this.logger.log(
-            `${username} - Stopping incremental fetch: Tweet ${tweet.id} from ${tweet.timeParsed.toISOString()} is older than cutoff ${effectiveCutoffDate.toISOString()}`,
+          // TODO: Remove after fixing the social media data not updating issue
+          this.logger.debug(
+            `${username} - Processing tweet #${count}: ID=${tweet.id}, ` +
+              `timestamp=${tweet.timeParsed?.toISOString() ?? 'NO_TIMESTAMP'}, ` +
+              `isPin=${tweet.isPin}, text="${tweet.text?.substring(0, 50)}..."`,
           );
-          stoppedDueToOldTweet = true;
-          break;
-        }
 
-        // Include tweets that are within the time range
-        if (tweet.timeParsed && tweet.timeParsed >= effectiveCutoffDate) {
-          tweets.push(tweet);
-          this.logger.debug(
-            `${username} - Added tweet ${tweet.id} from ${tweet.timeParsed.toISOString()} (incremental)`,
-          );
-        } else if (!tweet.timeParsed) {
-          this.logger.debug(
-            `${username} - Tweet ${tweet.id} has no timeParsed, skipping (incremental)`,
-          );
+          // Check if we've hit our limits
+          if (tweets.length >= this.maxTweetsToCollect) {
+            this.logger.debug(
+              `${username} - Reached ${this.maxTweetsToCollect} tweets limit (incremental)`,
+            );
+            break;
+          }
+
+          if (count >= this.maxTweetsToCollect) {
+            this.logger.debug(
+              `${username} - Reached safety limit of ${this.maxTweetsToCollect} iterations (incremental)`,
+            );
+            break;
+          }
+
+          // Skip pinned tweets unless they meet our date criteria
+          // Pinned tweets can be old and break chronological order
+          if (tweet.isPin) {
+            // Only include pinned tweets if they're within our date range
+            if (tweet.timeParsed && tweet.timeParsed >= effectiveCutoffDate) {
+              this.logger.debug(
+                `${username} - Including pinned tweet ${tweet.id} from ${tweet.timeParsed.toISOString()} (within date range)`,
+              );
+              tweets.push(tweet);
+            } else {
+              this.logger.debug(
+                `${username} - Skipping pinned tweet ${tweet.id} (outside date range or no timestamp)`,
+              );
+              skippedPinnedTweets++;
+            }
+            continue;
+          }
+
+          // Check if tweet is too old - STOP SCRAPING if we hit the cutoff
+          // This is the key incremental fetching logic
+          if (tweet.timeParsed && tweet.timeParsed < effectiveCutoffDate) {
+            this.logger.log(
+              `${username} - Stopping incremental fetch: Tweet ${tweet.id} from ${tweet.timeParsed.toISOString()} is older than cutoff ${effectiveCutoffDate.toISOString()}`,
+            );
+            stoppedDueToOldTweet = true;
+            break;
+          }
+
+          // Include tweets that are within the time range
+          if (tweet.timeParsed && tweet.timeParsed >= effectiveCutoffDate) {
+            tweets.push(tweet);
+            this.logger.debug(
+              `${username} - Added tweet ${tweet.id} from ${tweet.timeParsed.toISOString()} (incremental)`,
+            );
+          } else if (!tweet.timeParsed) {
+            this.logger.debug(
+              `${username} - Tweet ${tweet.id} has no timeParsed, skipping (incremental)`,
+            );
+          }
         }
+      } catch (iteratorError) {
+        // TODO: Remove after fixing the social media data not updating issue
+        this.logger.error(
+          `${username} - Tweet iterator failed: ${iteratorError.message}`,
+        );
+        // Continue with whatever tweets we managed to collect before the error
       }
 
       // TODO: Remove after fixing the social media data not updating issue

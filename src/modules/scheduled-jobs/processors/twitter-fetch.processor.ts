@@ -99,10 +99,29 @@ export class TwitterFetchProcessor {
           `(Project: ${projectId}, Since: ${latestTimestamp?.toISOString() ?? 'beginning'})`,
       );
 
-      // Step 3: Fetch recent tweets using incremental fetching
-      const tweets = await this.twitterService.getRecentTweetsIncremental(
+      // Step 3: Fetch recent tweets using incremental fetching with timeout
+      // TODO: Remove after fixing the social media data not updating issue
+      this.logger.log(
+        `Calling TwitterService.getRecentTweetsIncremental for ${cleanUsername}...`,
+      );
+
+      const fetchPromise = this.twitterService.getRecentTweetsIncremental(
         projectAccount.xUrl,
         latestTimestamp ?? undefined,
+      );
+
+      // Add timeout to detect hanging calls
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(new Error('Twitter fetch timeout after 5 minutes'));
+        }, 300000); // 5 minute timeout
+      });
+
+      const tweets = await Promise.race([fetchPromise, timeoutPromise]);
+
+      // TODO: Remove after fixing the social media data not updating issue
+      this.logger.log(
+        `TwitterService.getRecentTweetsIncremental returned ${tweets.length} tweets for ${cleanUsername}`,
       );
 
       if (tweets.length === 0) {

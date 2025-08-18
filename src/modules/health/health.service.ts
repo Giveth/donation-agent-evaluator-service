@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { TypeOrmHealthIndicator, HttpHealthIndicator } from '@nestjs/terminus';
 import { Cache } from 'cache-manager';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { DataSource, QueryRunner } from 'typeorm';
 
 // Constants
 const HEALTH_CHECK_CACHE_KEY = 'health_check_test';
@@ -25,6 +26,7 @@ export interface DetailedHealthReport {
     arrayBuffers: number;
   };
   database: HealthCheckResult;
+  connectionPool: HealthCheckResult;
   cache: HealthCheckResult;
   external: {
     impactGraph: HealthCheckResult;
@@ -44,6 +46,7 @@ export class HealthService {
     private readonly httpHealthIndicator: HttpHealthIndicator,
     private readonly configService: ConfigService,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
+    private readonly dataSource: DataSource,
   ) {
     this.healthCheckTimeout = parseInt(
       this.configService.get('HEALTH_CHECK_TIMEOUT', '10000'),
@@ -118,6 +121,99 @@ export class HealthService {
         duration,
         timestamp: new Date().toISOString(),
       };
+    }
+  }
+
+  /**
+   * Connection pool health check
+   * Actually tests the pool by acquiring and releasing a connection
+   */
+  async getConnectionPoolHealth(): Promise<HealthCheckResult> {
+    const startTime = Date.now();
+    let queryRunner: QueryRunner | undefined;
+
+    try {
+      // Get connection pool driver for metrics
+      const driver = this.dataSource.driver as unknown as {
+        master?: {
+          totalCount?: number;
+          idleCount?: number;
+          waitingCount?: number;
+          options?: { max?: number };
+        };
+        pool?: {
+          totalCount?: number;
+          idleCount?: number;
+          waitingCount?: number;
+          options?: { max?: number };
+        };
+      };
+      const pool = driver.master ?? driver.pool;
+
+      // Extract pool metrics (works with pg-pool)
+      const poolMetrics = {
+        totalConnections: pool?.totalCount ?? 'unavailable',
+        idleConnections: pool?.idleCount ?? 'unavailable',
+        waitingClients: pool?.waitingCount ?? 'unavailable',
+        maxConnections: pool?.options?.max ?? 'unavailable',
+      };
+
+      // Actually test the connection pool by acquiring a connection
+      queryRunner = this.dataSource.createQueryRunner();
+      await queryRunner.connect();
+
+      // Test the connection with a simple query
+      await queryRunner.query('SELECT 1');
+
+      const duration = Date.now() - startTime;
+
+      // Calculate utilization percentage
+      const utilizationPercent =
+        typeof poolMetrics.totalConnections === 'number' &&
+        typeof poolMetrics.maxConnections === 'number'
+          ? Math.round(
+              (poolMetrics.totalConnections / poolMetrics.maxConnections) * 100,
+            )
+          : 'unavailable';
+
+      // Determine status based on utilization and connection test
+      const isHealthy =
+        typeof utilizationPercent === 'number'
+          ? utilizationPercent < 90 // Alert if > 90% utilization
+          : true; // If we can't determine, assume healthy
+
+      return {
+        status: isHealthy ? 'ok' : 'error',
+        details: {
+          ...poolMetrics,
+          utilizationPercent,
+          connectionTest: 'passed',
+          status: isHealthy ? 'healthy' : 'high utilization',
+        },
+        duration,
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      this.logger.error('Connection pool health check failed', error);
+      return {
+        status: 'error',
+        details: {
+          error: error instanceof Error ? error.message : 'Unknown error',
+          connectionTest: 'failed',
+        },
+        duration,
+        timestamp: new Date().toISOString(),
+      };
+    } finally {
+      // Always release the connection back to the pool
+      if (queryRunner) {
+        try {
+          await queryRunner.release();
+        } catch (releaseError) {
+          this.logger.warn('Failed to release query runner:', releaseError);
+        }
+      }
     }
   }
 
@@ -298,12 +394,14 @@ export class HealthService {
   async getDetailedHealthReport(): Promise<DetailedHealthReport> {
     const basicHealth = this.getBasicHealth();
     const databaseHealth = await this.getDatabaseHealth();
+    const connectionPoolHealth = await this.getConnectionPoolHealth();
     const cacheHealth = await this.getCacheHealth();
     const externalHealth = await this.getExternalServicesHealth();
 
     const overallStatus = [
       basicHealth.status,
       databaseHealth.status,
+      connectionPoolHealth.status,
       cacheHealth.status,
       externalHealth.impactGraph.status,
       externalHealth.openRouterApi.status,
@@ -322,6 +420,7 @@ export class HealthService {
         arrayBuffers: number;
       },
       database: databaseHealth,
+      connectionPool: connectionPoolHealth,
       cache: cacheHealth,
       external: externalHealth,
       timestamp: new Date().toISOString(),

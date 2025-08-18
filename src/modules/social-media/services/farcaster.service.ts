@@ -72,11 +72,11 @@ export class FarcasterService {
       maxRetries: this.configService.get<number>('FARCASTER_MAX_RETRIES', 3),
       lookbackDays: this.configService.get<number>(
         'FARCASTER_POSTS_LOOKBACK_DAYS',
-        60,
+        30,
       ),
       maxPostsPerProject: this.configService.get<number>(
         'FARCASTER_MAX_POSTS_PER_PROJECT',
-        10,
+        15,
       ),
       fidCacheTtl: this.configService.get<number>(
         'FARCASTER_FID_CACHE_TTL',
@@ -86,7 +86,7 @@ export class FarcasterService {
         'FARCASTER_CASTS_CACHE_TTL',
         3600,
       ), // 1 hour
-      batchSize: this.configService.get<number>('FARCASTER_BATCH_SIZE', 30),
+      batchSize: this.configService.get<number>('FARCASTER_BATCH_SIZE', 15),
     };
 
     this.logger.log(

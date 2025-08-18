@@ -19,8 +19,8 @@ describe('ScoringService', () => {
       const config: Record<string, any> = {
         SCORING_UPDATE_RECENCY_DECAY_DAYS: 30,
         SCORING_SOCIAL_RECENCY_DECAY_DAYS: 14,
-        SCORING_SOCIAL_FREQUENCY_DAYS: 60,
-        SCORING_MIN_POSTS_FOR_FULL_FREQUENCY: 45,
+        SCORING_SOCIAL_FREQUENCY_DAYS: 30,
+        SCORING_MIN_POSTS_FOR_FULL_FREQUENCY: 10,
       };
       return config[key] ?? defaultValue;
     }),

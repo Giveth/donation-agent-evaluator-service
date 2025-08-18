@@ -204,7 +204,7 @@ export class SocialPostStorageService {
       }
 
       const maxCount = parseInt(
-        this.configService.get('SOCIAL_POST_MAX_COUNT', '50'),
+        this.configService.get('SOCIAL_POST_MAX_COUNT', '15'),
         10,
       );
       const maxAgeDays = parseInt(

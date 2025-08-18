@@ -28,15 +28,15 @@ This shows:
 ### 1. Social Media Frequency Evaluation Period
 - **Before**: 30 days lookback period
 - **After**: 60 days lookback period
-- **Config**: `SCORING_SOCIAL_FREQUENCY_DAYS=60`
+- **Config**: `SCORING_SOCIAL_FREQUENCY_DAYS=30`
 
 ### 2. Minimum Posts for Perfect Score
 - **Before**: 30 posts required for 100% score
 - **After**: 45 posts required for 100% score
-- **Config**: `SCORING_MIN_POSTS_FOR_FULL_FREQUENCY=45`
+- **Config**: `SCORING_MIN_POSTS_FOR_FULL_FREQUENCY=10`
 
 ### 3. Twitter Posts Lookback
-- **Config**: `TWITTER_POSTS_LOOKBACK_DAYS=60` (should match frequency period)
+- **Config**: `TWITTER_POSTS_LOOKBACK_DAYS=30` (should match frequency period)
 
 ### 4. Database Reset
 - **Action**: `POST /admin/reset-social-timestamps?clearPosts=true`
@@ -123,8 +123,8 @@ if (tweets.length >= this.maxTweetsToCollect) break;
 
 **New Environment Variables**:
 ```bash
-TWITTER_MAX_TWEETS_TO_COLLECT=50       # Maximum tweets to collect and store
-TWITTER_POSTS_LOOKBACK_DAYS=60         # Days to look back for posts
+TWITTER_MAX_TWEETS_TO_COLLECT=15       # Maximum tweets to collect and store
+TWITTER_POSTS_LOOKBACK_DAYS=30         # Days to look back for posts
 ```
 
 This ensures projects can now collect the 45+ posts needed for perfect frequency scores, and the limits are easily adjustable for future requirements.
@@ -175,9 +175,9 @@ curl "https://staging.eval.ads.giveth.io/admin/stats"
 Ensure these environment variables are set correctly:
 
 ```bash
-TWITTER_POSTS_LOOKBACK_DAYS=60           # TwitterService lookback
+TWITTER_POSTS_LOOKBACK_DAYS=30           # TwitterService lookback
 _DAYS=60         # ScoringService frequency period
-SCORING_MIN_POSTS_FOR_FULL_FREQUENCY=45  # Minimum posts for 100% score
+SCORING_MIN_POSTS_FOR_FULL_FREQUENCY=10  # Minimum posts for 100% score
 ```
 
 ## Impact Assessment

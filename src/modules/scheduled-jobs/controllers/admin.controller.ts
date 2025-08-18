@@ -657,7 +657,7 @@ export class AdminController {
 
       // Retrieve social posts for multiple projects
       const defaultLimit = parseInt(
-        this.configService.get('SOCIAL_POST_MAX_COUNT', '50'),
+        this.configService.get('SOCIAL_POST_MAX_COUNT', '15'),
         10,
       );
       const result =

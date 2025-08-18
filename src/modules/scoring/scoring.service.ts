@@ -45,17 +45,17 @@ export class ScoringService {
 
     this.socialFrequencyDays = this.configService.get<number>(
       'SCORING_SOCIAL_FREQUENCY_DAYS',
-      60, // Default: Consider posts from last 60 days
+      30, // Default: Consider posts from last 30 days
     );
 
     this.minPostsForFullFrequencyScore = this.configService.get<number>(
       'SCORING_MIN_POSTS_FOR_FULL_FREQUENCY',
-      45, // Default: 45 posts in 60 days for full score
+      10, // Default: 15 posts in 60 days for full score
     );
 
     this.maxPostsForLLMAssessment = this.configService.get<number>(
       'SOCIAL_POST_MAX_COUNT',
-      50, // Default: Use all stored posts for LLM assessment
+      15, // Default: Use all stored posts for LLM assessment
     );
 
     this.logger.log(

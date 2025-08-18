@@ -62,8 +62,8 @@ Set these environment variables to customize scoring behavior:
 # Decay rates and thresholds
 SCORING_UPDATE_RECENCY_DECAY_DAYS=30        # Days for 50% score on update recency
 SCORING_SOCIAL_RECENCY_DECAY_DAYS=14        # Days for 50% score on social recency
-SCORING_SOCIAL_FREQUENCY_DAYS=60            # Days to consider for frequency calculation
-SCORING_MIN_POSTS_FOR_FULL_FREQUENCY=45     # Min posts for full frequency score
+SCORING_SOCIAL_FREQUENCY_DAYS=30            # Days to consider for frequency calculation
+SCORING_MIN_POSTS_FOR_FULL_FREQUENCY=10     # Min posts for full frequency score
 
 # Optional: Custom scoring weights (must sum to 1.0)
 SCORING_WEIGHTS='{"projectInfoQuality":0.20,"updateRecency":0.10,"socialMediaQuality":0.20,"socialMediaRecency":0.05,"socialMediaFrequency":0.05,"relevanceToCause":0.20,"existingQualityScore":0.10,"givPowerRank":0.10}'

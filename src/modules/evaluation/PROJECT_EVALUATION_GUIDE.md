@@ -122,8 +122,8 @@ SCORING_WEIGHT_GIVPOWER_RANK=15            # Default: 15%
 ```bash
 SCORING_UPDATE_RECENCY_DECAY_DAYS=30       # Default: 30 days for 50% score
 SCORING_SOCIAL_RECENCY_DECAY_DAYS=14       # Default: 14 days for 50% score
-SCORING_SOCIAL_FREQUENCY_DAYS=60           # Default: Consider last 60 days
-SCORING_MIN_POSTS_FOR_FULL_FREQUENCY=45   # Default: 45 posts for 100% score
+SCORING_SOCIAL_FREQUENCY_DAYS=30           # Default: Consider last 30 days
+SCORING_MIN_POSTS_FOR_FULL_FREQUENCY=10   # Default: 10 posts for 100% score
 ```
 
 ## Error Handling Strategy

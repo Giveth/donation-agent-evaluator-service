@@ -103,9 +103,9 @@ export class TwitterService {
 
     // Posts configuration
     this.postsLookbackDays =
-      this.configService.get<number>('TWITTER_POSTS_LOOKBACK_DAYS') ?? 60; // 60 days
+      this.configService.get<number>('TWITTER_POSTS_LOOKBACK_DAYS') ?? 30; // 30 days
     this.maxTweetsToCollect =
-      this.configService.get<number>('TWITTER_MAX_TWEETS_TO_COLLECT') ?? 50; // Collect and fetch up to 50 tweets
+      this.configService.get<number>('TWITTER_MAX_TWEETS_TO_COLLECT') ?? 15; // Collect and fetch up to 15 tweets
 
     // Initialize Twitter account credentials
     this.account1 = {

@@ -1121,22 +1121,14 @@ export class TwitterService {
         `${username} - Authentication verified, creating iterator...`,
       );
 
-      const tweetIterator = this.scraper.getTweets(
-        username,
-        this.maxTweetsToCollect,
-      );
       // TODO: Remove after fixing the social media data not updating issue
-      this.logger.log(
-        `${username} - Created tweet iterator, starting iteration...`,
-      );
-
-      // TODO: Remove after fixing the social media data not updating issue
-      this.logger.log(
-        `${username} - Starting to await tweets from iterator...`,
-      );
+      this.logger.log(`${username} - Starting direct iteration over tweets...`);
 
       try {
-        for await (const tweet of tweetIterator) {
+        for await (const tweet of this.scraper.getTweets(
+          username,
+          this.maxTweetsToCollect,
+        )) {
           count++;
 
           // TODO: Remove after fixing the social media data not updating issue

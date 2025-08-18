@@ -1107,6 +1107,20 @@ export class TwitterService {
         `${username} - Starting incremental tweet scraping with max ${this.maxTweetsToCollect} iterations`,
       );
 
+      // Verify authentication status immediately before creating iterator
+      const isLoggedIn = await this.scraper.isLoggedIn();
+      if (!isLoggedIn) {
+        this.logger.error(
+          `${username} - Authentication failed before iterator creation. Aborting fetch.`,
+        );
+        return [];
+      }
+
+      // TODO: Remove after fixing the social media data not updating issue
+      this.logger.log(
+        `${username} - Authentication verified, creating iterator...`,
+      );
+
       const tweetIterator = this.scraper.getTweets(
         username,
         this.maxTweetsToCollect,

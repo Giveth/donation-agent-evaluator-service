@@ -295,7 +295,7 @@ export class EvaluationQueueService {
       );
     }
 
-    return result.affected || 0;
+    return result.affected ?? 0;
   }
 
   /**

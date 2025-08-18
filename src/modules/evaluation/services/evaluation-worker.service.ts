@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { EvaluationService } from '../evaluation.service';
 import { EvaluationQueueService } from './evaluation-queue.service';
@@ -10,14 +10,33 @@ import { EvaluateProjectsRequestDto } from '../dto/evaluate-projects-request.dto
 import { EvaluateMultipleCausesRequestDto } from '../dto/evaluate-multiple-causes-request.dto';
 
 @Injectable()
-export class EvaluationWorkerService {
+export class EvaluationWorkerService implements OnModuleInit {
   private readonly logger = new Logger(EvaluationWorkerService.name);
-  private isProcessing = false;
 
   constructor(
     private readonly evaluationService: EvaluationService,
     private readonly evaluationQueueService: EvaluationQueueService,
   ) {}
+
+  /**
+   * Called after module initialization to cleanup any stuck jobs from previous runs
+   */
+  async onModuleInit(): Promise<void> {
+    try {
+      this.logger.log('Initializing EvaluationWorkerService...');
+      const cleanedUp =
+        await this.evaluationQueueService.cleanupStuckEvaluationJobs(10);
+      if (cleanedUp > 0) {
+        this.logger.log(
+          `Cleaned up ${cleanedUp} stuck evaluation jobs on startup`,
+        );
+      } else {
+        this.logger.log('No stuck evaluation jobs found on startup');
+      }
+    } catch (error) {
+      this.logger.error('Failed to cleanup stuck jobs on startup:', error);
+    }
+  }
 
   /**
    * Cron job that processes pending evaluation jobs every 30 seconds
@@ -28,8 +47,10 @@ export class EvaluationWorkerService {
     timeZone: 'UTC',
   })
   async processEvaluationJobs(): Promise<void> {
-    // Prevent overlapping job processing
-    if (this.isProcessing) {
+    // Check if any jobs are already processing to prevent overlapping
+    const hasProcessingJobs =
+      await this.evaluationQueueService.hasProcessingEvaluationJobs();
+    if (hasProcessingJobs) {
       this.logger.debug(
         'Evaluation job processing already in progress, skipping',
       );
@@ -39,7 +60,8 @@ export class EvaluationWorkerService {
     this.logger.debug('Checking for pending evaluation jobs...');
 
     try {
-      this.isProcessing = true;
+      // First cleanup any stuck jobs before processing new ones
+      await this.evaluationQueueService.cleanupStuckEvaluationJobs(10);
 
       const pendingJobs =
         await this.evaluationQueueService.getPendingEvaluationJobs();
@@ -57,7 +79,7 @@ export class EvaluationWorkerService {
       // The evaluation service already has pLimit concurrency control
       for (const job of pendingJobs) {
         try {
-          await this.processEvaluationJob(job);
+          await this.processEvaluationJobWithTimeout(job);
         } catch (error) {
           this.logger.error(
             `Failed to process evaluation job ${job.id}:`,
@@ -77,8 +99,40 @@ export class EvaluationWorkerService {
       );
     } catch (error) {
       this.logger.error('Failed to process evaluation jobs:', error);
-    } finally {
-      this.isProcessing = false;
+    }
+  }
+
+  /**
+   * Processes a single evaluation job with timeout protection
+   * @param job - The scheduled job to process
+   */
+  private async processEvaluationJobWithTimeout(
+    job: ScheduledJob,
+  ): Promise<void> {
+    const TIMEOUT_MS = 20 * 60 * 1000; // 20 minutes timeout
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => {
+        reject(
+          new Error(
+            `Job ${job.id} timed out after ${TIMEOUT_MS / 1000} seconds`,
+          ),
+        );
+      }, TIMEOUT_MS);
+    });
+
+    try {
+      await Promise.race([this.processEvaluationJob(job), timeoutPromise]);
+    } catch (error) {
+      // If it's a timeout error, make sure to fail the job properly
+      if (error instanceof Error && error.message.includes('timed out')) {
+        this.logger.error(`Job ${job.id} timed out, marking as failed`);
+        await this.evaluationQueueService.markJobAsFailed(
+          job.id,
+          error.message,
+        );
+      }
+      throw error;
     }
   }
 
@@ -215,13 +269,16 @@ export class EvaluationWorkerService {
   async manualProcessJobs(): Promise<number> {
     this.logger.log('Manual evaluation job processing triggered');
 
-    if (this.isProcessing) {
+    const hasProcessingJobs =
+      await this.evaluationQueueService.hasProcessingEvaluationJobs();
+    if (hasProcessingJobs) {
       this.logger.warn('Evaluation job processing already in progress');
       return 0;
     }
 
     try {
-      this.isProcessing = true;
+      // First cleanup any stuck jobs
+      await this.evaluationQueueService.cleanupStuckEvaluationJobs(10);
 
       const pendingJobs =
         await this.evaluationQueueService.getPendingEvaluationJobs();
@@ -233,7 +290,7 @@ export class EvaluationWorkerService {
       let processedCount = 0;
       for (const job of pendingJobs) {
         try {
-          await this.processEvaluationJob(job);
+          await this.processEvaluationJobWithTimeout(job);
           processedCount++;
         } catch (error) {
           this.logger.error(
@@ -255,8 +312,6 @@ export class EvaluationWorkerService {
     } catch (error) {
       this.logger.error('Failed to manually process evaluation jobs:', error);
       throw error;
-    } finally {
-      this.isProcessing = false;
     }
   }
 
@@ -264,7 +319,7 @@ export class EvaluationWorkerService {
    * Gets the current processing status
    * @returns Whether the service is currently processing jobs
    */
-  isCurrentlyProcessing(): boolean {
-    return this.isProcessing;
+  async isCurrentlyProcessing(): Promise<boolean> {
+    return await this.evaluationQueueService.hasProcessingEvaluationJobs();
   }
 }

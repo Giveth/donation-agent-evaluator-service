@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import {
   ScheduledJob,
   JobType,
@@ -257,6 +257,63 @@ export class EvaluationQueueService {
       .orderBy('job.scheduledFor', 'ASC')
       .limit(10)
       .getMany();
+  }
+
+  /**
+   * Cleans up stuck evaluation jobs that have been processing for too long
+   * This handles cases where jobs get stuck due to crashes or timeouts
+   * @param timeoutMinutes - Minutes after which a processing job is considered stuck (default: 10)
+   * @returns Number of stuck jobs cleaned up
+   */
+  async cleanupStuckEvaluationJobs(
+    timeoutMinutes: number = 10,
+  ): Promise<number> {
+    const timeoutThreshold = new Date();
+    timeoutThreshold.setMinutes(timeoutThreshold.getMinutes() - timeoutMinutes);
+
+    const result = await this.scheduledJobRepository
+      .createQueryBuilder()
+      .update(ScheduledJob)
+      .set({
+        status: JobStatus.PENDING,
+        error:
+          'Job was stuck in processing state and has been reset to pending',
+      })
+      .where('jobType IN (:...types)', {
+        types: [
+          JobType.SINGLE_CAUSE_EVALUATION,
+          JobType.MULTI_CAUSE_EVALUATION,
+        ],
+      })
+      .andWhere('status = :status', { status: JobStatus.PROCESSING })
+      .andWhere('processedAt < :threshold', { threshold: timeoutThreshold })
+      .execute();
+
+    if (result.affected && result.affected > 0) {
+      this.logger.warn(
+        `Cleaned up ${result.affected} stuck evaluation jobs that were processing for more than ${timeoutMinutes} minutes`,
+      );
+    }
+
+    return result.affected ?? 0;
+  }
+
+  /**
+   * Checks if there are any evaluation jobs currently processing
+   * @returns True if any evaluation jobs are in PROCESSING status
+   */
+  async hasProcessingEvaluationJobs(): Promise<boolean> {
+    const count = await this.scheduledJobRepository.count({
+      where: {
+        jobType: In([
+          JobType.SINGLE_CAUSE_EVALUATION,
+          JobType.MULTI_CAUSE_EVALUATION,
+        ]),
+        status: JobStatus.PROCESSING,
+      },
+    });
+
+    return count > 0;
   }
 
   /**

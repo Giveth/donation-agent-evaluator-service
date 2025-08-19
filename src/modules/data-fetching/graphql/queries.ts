@@ -462,6 +462,12 @@ export const ALL_PROJECTS_WITH_FILTERS_QUERY = gql`
           type
           link
         }
+
+        # Project power ranking information
+        projectPower {
+          totalPower
+          powerRank
+        }
       }
     }
   }

@@ -191,7 +191,7 @@ export class EvaluationService {
       lastUpdateTitle: project.lastUpdateTitle,
       socialPosts: allSocialPosts,
       givPowerRank: project.givPowerRank,
-      totalProjectCount: topPowerRank, // null if topPowerRank query failed - scoring service will handle this
+      topPowerRank, // null if topPowerRank query failed - scoring service will handle this
       causeTitle: cause.title,
       causeDescription: cause.description,
       causeCategories: cause.categories,

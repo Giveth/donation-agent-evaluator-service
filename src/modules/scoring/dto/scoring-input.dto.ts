@@ -66,12 +66,12 @@ export class ScoringInputDto {
   givPowerRank?: number;
 
   /**
-   * Total number of projects in the system (for rank normalization)
+   * Top (highest/worst) power rank value for rank normalization
    * When null, GIVpower scoring will be disabled (score = 0)
    */
   @IsOptional()
   @IsNumber()
-  totalProjectCount?: number | null;
+  topPowerRank?: number | null;
 
   /**
    * Cause title for relevance assessment

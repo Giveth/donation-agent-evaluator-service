@@ -105,7 +105,7 @@ export class ScoringService {
         evidenceOfImpactScore: llmAssessment.evidenceOfImpactScore,
         givPowerRankScore: this.calculateGivPowerRankScore(
           input.givPowerRank,
-          input.totalProjectCount,
+          input.topPowerRank,
         ),
       };
 
@@ -370,44 +370,61 @@ Respond in JSON format:
   /**
    * Calculate GIVpower rank score (0-100)
    * Lower rank = higher score
-   * Returns 0 when totalProjectCount is null (indicating getTopPowerRank query failed)
+   * Returns 0 when topPowerRank is null (indicating getTopPowerRank query failed)
    */
   private calculateGivPowerRankScore(
-    _givPowerRank?: number,
-    _totalProjectCount?: number | null,
+    givPowerRank?: number,
+    topPowerRank?: number | null,
   ): number {
-    // TODO: Re-enable GIVpower scoring when Impact Graph is fixed
-    // Currently returning 0 for all projects due to Impact Graph issues
-    return 0;
+    // Return 0 if top power rank query failed (indicated by null topPowerRank)
+    if (topPowerRank === null) {
+      this.logger.debug(
+        'GIVpower scoring disabled - topPowerRank is null (getTopPowerRank query failed)',
+      );
+      return 0;
+    }
 
-    // Original implementation commented out until Impact Graph is fixed:
-    // // Return 0 if top power rank query failed (indicated by null totalProjectCount)
-    // if (totalProjectCount === null) {
-    //   this.logger.debug(
-    //     'GIVpower scoring disabled - totalProjectCount is null (getTopPowerRank query failed)',
-    //   );
-    //   return 0;
-    // }
+    // Return 0 if project has no GIVpower rank
+    if (!givPowerRank) {
+      return 0;
+    }
 
-    // // Return 0 if project has no GIVpower rank
-    // if (!givPowerRank) {
-    //   return 0;
-    // }
+    // Return 0 if topPowerRank is not available (shouldn't happen with new implementation)
+    if (!topPowerRank) {
+      this.logger.warn('GIVpower scoring disabled - topPowerRank is undefined');
+      return 0;
+    }
 
-    // // Return 0 if totalProjectCount is not available (shouldn't happen with new implementation)
-    // if (!totalProjectCount) {
-    //   this.logger.warn(
-    //     'GIVpower scoring disabled - totalProjectCount is undefined',
-    //   );
-    //   return 0;
-    // }
+    // Safeguard against division by zero and invalid values
+    if (topPowerRank <= 0) {
+      this.logger.warn(
+        `GIVpower scoring disabled - invalid topPowerRank: ${topPowerRank}`,
+      );
+      return 0;
+    }
 
-    // // Normalize rank to percentile (lower rank is better)
-    // // Top 10% get 90-100 score, bottom 10% get 0-10 score
-    // const percentile = (totalProjectCount - givPowerRank) / totalProjectCount;
-    // const score = percentile * 100;
+    // Safeguard against invalid rank values
+    if (givPowerRank < 0) {
+      this.logger.warn(
+        `Invalid givPowerRank: ${givPowerRank}, treating as unranked`,
+      );
+      return 0;
+    }
 
-    // return Math.round(Math.max(0, Math.min(100, score)));
+    // Handle edge case where givPowerRank > topPowerRank (shouldn't happen)
+    if (givPowerRank > topPowerRank) {
+      this.logger.warn(
+        `Anomaly detected: givPowerRank (${givPowerRank}) > topPowerRank (${topPowerRank}), treating as worst rank`,
+      );
+      return 0;
+    }
+
+    // Normalize rank to percentile (lower rank is better)
+    // Top 10% get 90-100 score, bottom 10% get 0-10 score
+    const percentile = (topPowerRank - givPowerRank) / topPowerRank;
+    const score = percentile * 100;
+
+    return Math.round(Math.max(0, Math.min(100, score)));
   }
 
   /**

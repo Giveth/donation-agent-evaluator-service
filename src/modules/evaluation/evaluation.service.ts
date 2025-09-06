@@ -49,28 +49,44 @@ export class EvaluationService {
    */
   async evaluateProjects(
     cause: CauseDto,
-    projectIds: number[],
+    projectsWithPower: {
+      id: number;
+      powerRank?: number;
+      totalPower?: number;
+    }[],
+    highestPowerRank?: number,
   ): Promise<ScoredProjectDto[]> {
     const startTime = Date.now();
     this.logger.log(
-      `Starting evaluation for cause ${cause.id} with ${projectIds.length} projects`,
+      `Starting evaluation for cause ${cause.id} with ${projectsWithPower.length} projects`,
+    );
+
+    // Log project power data structure for debugging
+    const powerDataSummary = projectsWithPower.map(p => ({
+      id: p.id,
+      powerRank: p.powerRank,
+      totalPower: p.totalPower,
+    }));
+    this.logger.debug(
+      `Cause ${cause.id} project power data: ${JSON.stringify(powerDataSummary)}`,
     );
 
     const scoredProjects: ScoredProjectDto[] = [];
 
     try {
-      // Fetch top power rank once for all projects in this evaluation
-      const topPowerRank = await this.dataFetchingService.getTopPowerRank();
-
-      if (topPowerRank === null) {
+      // Use highestPowerRank from request instead of fetching it
+      if (highestPowerRank == null) {
         this.logger.warn(
-          `Top power rank unavailable for cause ${cause.id} - GIVpower scores will be set to 0 for all projects`,
+          `Highest power rank unavailable for cause ${cause.id} - GIVpower scores will be set to 0 for all projects`,
         );
       } else {
         this.logger.debug(
-          `Using top power rank: ${topPowerRank} for all projects in cause ${cause.id}`,
+          `Using highest power rank: ${highestPowerRank} for all projects in cause ${cause.id}`,
         );
       }
+
+      // Extract project IDs for fetching project details
+      const projectIds = projectsWithPower.map(p => p.id);
 
       // Fetch project details from local database first, fallback to GraphQL
       const projects =
@@ -81,13 +97,22 @@ export class EvaluationService {
       );
 
       // Process projects in parallel with controlled concurrency
-      const evaluationPromises = projects.map(project =>
-        this.projectConcurrencyLimit(async () => {
+      const evaluationPromises = projects.map(project => {
+        // Find the power data for this project
+        const powerData = projectsWithPower.find(p => p.id === project.id);
+
+        // Log Givpower data for debugging staging issues
+        this.logger.debug(
+          `Project ${project.id}: powerRank from request=${powerData?.powerRank}, project.givPowerRank=${project.givPowerRank}, using powerRank=${powerData?.powerRank}`,
+        );
+
+        return this.projectConcurrencyLimit(async () => {
           try {
             const scoredProject = await this.evaluateProject(
               project,
               cause,
-              topPowerRank,
+              highestPowerRank,
+              powerData?.powerRank,
             );
             this.logger.debug(
               `Successfully evaluated project ${project.id} with score ${scoredProject.causeScore}`,
@@ -108,8 +133,8 @@ export class EvaluationService {
               evaluationTimestamp: new Date(),
             };
           }
-        }),
-      );
+        });
+      });
 
       // Wait for all project evaluations to complete
       const evaluationResults = await Promise.all(evaluationPromises);
@@ -142,13 +167,15 @@ export class EvaluationService {
    *
    * @param project - The project details
    * @param cause - The cause context
-   * @param topPowerRank - The top power rank value for scoring normalization, or null if unavailable
+   * @param highestPowerRank - The highest power rank value for scoring normalization, or null if unavailable
+   * @param powerRank - The power rank for this specific project
    * @returns Promise<ScoredProjectDto> - The scored project
    */
   private async evaluateProject(
     project: ProjectDetailsDto,
     cause: CauseDto,
-    topPowerRank: number | null,
+    highestPowerRank: number | null | undefined,
+    powerRank?: number,
   ): Promise<ScoredProjectDto> {
     this.logger.debug(`Evaluating project ${project.id} (${project.title})`);
 
@@ -181,6 +208,11 @@ export class EvaluationService {
       `Project ${project.id}: Found ${twitterPosts.length} Twitter posts, ${farcasterPosts.length} Farcaster posts`,
     );
 
+    // Log Givpower values being passed to scoring
+    this.logger.debug(
+      `Project ${project.id}: Passing to scoring - givPowerRank=${powerRank}, topPowerRank=${highestPowerRank}`,
+    );
+
     // Prepare scoring input
     const scoringInput = new ProjectScoreInputsDto({
       projectId: project.id.toString(),
@@ -190,8 +222,8 @@ export class EvaluationService {
       lastUpdateContent: project.lastUpdateContent,
       lastUpdateTitle: project.lastUpdateTitle,
       socialPosts: allSocialPosts,
-      givPowerRank: project.givPowerRank,
-      topPowerRank, // null if topPowerRank query failed - scoring service will handle this
+      givPowerRank: powerRank, // Use powerRank from request instead of project.givPowerRank
+      topPowerRank: highestPowerRank, // Use highestPowerRank from request
       causeTitle: cause.title,
       causeDescription: cause.description,
       causeCategories: cause.categories,
@@ -200,6 +232,11 @@ export class EvaluationService {
     // Calculate scores using the scoring service
     const { finalScore, breakdown } =
       await this.scoringService.calculateCauseScore(scoringInput);
+
+    // Log final GIVpower scoring result
+    this.logger.debug(
+      `Project ${project.id}: Final scores - GIVpower score=${breakdown.givPowerRankScore}, overall cause score=${finalScore}`,
+    );
 
     const result = {
       projectId: project.id.toString(),
@@ -227,12 +264,69 @@ export class EvaluationService {
    */
   async evaluateProjectsWithMetadata(
     request: EvaluateProjectsRequestDto,
+    highestPowerRank?: number,
+  ): Promise<EvaluationResultDto> {
+    const startTime = Date.now();
+
+    // Log single cause evaluation request for debugging
+    this.logger.log(
+      `Single cause evaluation: cause=${request.cause.id}, ${request.projectIds.length} projects, highestPowerRank=${highestPowerRank}`,
+    );
+
+    const scoredProjects = await this.evaluateProjects(
+      request.cause,
+      request.projectIds,
+      highestPowerRank,
+    );
+
+    const duration = Date.now() - startTime;
+    const projectsWithStoredPosts = scoredProjects.filter(
+      p => p.hasStoredPosts,
+    ).length;
+
+    const result = {
+      data: scoredProjects,
+      status: 'success',
+      causeId: request.cause.id,
+      totalProjects: scoredProjects.length,
+      projectsWithStoredPosts,
+      evaluationDuration: duration,
+      timestamp: new Date(),
+    };
+
+    // Send evaluation results to Impact Graph (non-blocking)
+    this.sendEvaluationToImpactGraph(request.cause.id, scoredProjects);
+
+    // Log evaluation results to CSV (non-blocking)
+    this.csvLoggerService
+      .logEvaluationResult(request.cause, result)
+      .catch(error => {
+        this.logger.warn(
+          `Failed to log CSV for cause ${request.cause.id}: ${error.message}`,
+        );
+      });
+
+    return result;
+  }
+
+  /**
+   * Helper method to evaluate projects with a pre-fetched highestPowerRank
+   * Used by multi-cause evaluation to avoid calling getTopPowerRank multiple times
+   *
+   * @param request - Contains cause details and project IDs to evaluate
+   * @param highestPowerRank - Pre-fetched highest power rank value (or null if unavailable)
+   * @returns Promise<EvaluationResultDto> - Evaluation result with metadata
+   */
+  private async evaluateProjectsWithTopPowerRank(
+    request: EvaluateProjectsRequestDto,
+    highestPowerRank: number | null,
   ): Promise<EvaluationResultDto> {
     const startTime = Date.now();
 
     const scoredProjects = await this.evaluateProjects(
       request.cause,
       request.projectIds,
+      highestPowerRank ?? undefined,
     );
 
     const duration = Date.now() - startTime;
@@ -263,143 +357,6 @@ export class EvaluationService {
       });
 
     return result;
-  }
-
-  /**
-   * Helper method to evaluate projects with a pre-fetched topPowerRank
-   * Used by multi-cause evaluation to avoid calling getTopPowerRank multiple times
-   *
-   * @param request - Contains cause details and project IDs to evaluate
-   * @param topPowerRank - Pre-fetched top power rank value (or null if unavailable)
-   * @returns Promise<EvaluationResultDto> - Evaluation result with metadata
-   */
-  private async evaluateProjectsWithTopPowerRank(
-    request: EvaluateProjectsRequestDto,
-    topPowerRank: number | null,
-  ): Promise<EvaluationResultDto> {
-    const startTime = Date.now();
-
-    const scoredProjects = await this.evaluateProjectsWithSharedTopPowerRank(
-      request.cause,
-      request.projectIds,
-      topPowerRank,
-    );
-
-    const duration = Date.now() - startTime;
-    const projectsWithStoredPosts = scoredProjects.filter(
-      p => p.hasStoredPosts,
-    ).length;
-
-    const result = {
-      data: scoredProjects,
-      status: 'success',
-      causeId: request.cause.id,
-      totalProjects: scoredProjects.length,
-      projectsWithStoredPosts,
-      evaluationDuration: duration,
-      timestamp: new Date(),
-    };
-
-    // Send evaluation results to Impact Graph (non-blocking)
-    this.sendEvaluationToImpactGraph(request.cause.id, scoredProjects);
-
-    // Log evaluation results to CSV (non-blocking)
-    this.csvLoggerService
-      .logEvaluationResult(request.cause, result)
-      .catch(error => {
-        this.logger.warn(
-          `Failed to log CSV for cause ${request.cause.id}: ${error.message}`,
-        );
-      });
-
-    return result;
-  }
-
-  /**
-   * Core evaluation logic that uses a shared topPowerRank value
-   * This avoids calling getTopPowerRank multiple times in multi-cause evaluations
-   *
-   * @param cause - The cause details
-   * @param projectIds - Array of project IDs to evaluate
-   * @param topPowerRank - Pre-fetched top power rank value (or null if unavailable)
-   * @returns Promise<ScoredProjectDto[]> - Sorted list of scored projects
-   */
-  private async evaluateProjectsWithSharedTopPowerRank(
-    cause: CauseDto,
-    projectIds: number[],
-    topPowerRank: number | null,
-  ): Promise<ScoredProjectDto[]> {
-    const startTime = Date.now();
-    this.logger.log(
-      `Starting evaluation for cause ${cause.id} with ${projectIds.length} projects using shared topPowerRank: ${topPowerRank}`,
-    );
-
-    const scoredProjects: ScoredProjectDto[] = [];
-
-    try {
-      // Fetch project details from local database first, fallback to GraphQL
-      const projects =
-        await this.dataFetchingService.getProjectsByIds(projectIds);
-
-      this.logger.debug(
-        `Processing ${projects.length} projects with concurrency limit of 3`,
-      );
-
-      // Process projects in parallel with controlled concurrency
-      const evaluationPromises = projects.map(project =>
-        this.projectConcurrencyLimit(async () => {
-          try {
-            const scoredProject = await this.evaluateProject(
-              project,
-              cause,
-              topPowerRank,
-            );
-            this.logger.debug(
-              `Successfully evaluated project ${project.id} with score ${scoredProject.causeScore}`,
-            );
-            return scoredProject;
-          } catch (error) {
-            this.logger.error(
-              `Failed to evaluate project ${project.id}:`,
-              error,
-            );
-            // Return zero-score entry for failed evaluations
-            return {
-              projectId: project.id.toString(),
-              projectTitle: project.title,
-              causeScore: 0,
-              hasStoredPosts: false,
-              totalStoredPosts: 0,
-              evaluationTimestamp: new Date(),
-            };
-          }
-        }),
-      );
-
-      // Wait for all project evaluations to complete
-      const evaluationResults = await Promise.all(evaluationPromises);
-      scoredProjects.push(...evaluationResults);
-    } catch (error) {
-      this.logger.error(
-        `Failed to fetch projects for cause ${cause.id}:`,
-        error,
-      );
-      throw error;
-    }
-
-    // Sort by causeScore in descending order
-    scoredProjects.sort((a, b) => b.causeScore - a.causeScore);
-
-    const duration = Date.now() - startTime;
-    const projectsWithStoredPosts = scoredProjects.filter(
-      p => p.hasStoredPosts,
-    ).length;
-    this.logger.log(
-      `Completed evaluation for cause ${cause.id} in ${duration}ms. ` +
-        `${projectsWithStoredPosts}/${scoredProjects.length} projects had stored posts.`,
-    );
-
-    return scoredProjects;
   }
 
   /**
@@ -420,16 +377,21 @@ export class EvaluationService {
       `Starting multi-cause evaluation for ${totalCauses} causes`,
     );
 
-    // Fetch top power rank once for all causes in this evaluation
-    const topPowerRank = await this.dataFetchingService.getTopPowerRank();
+    // Use highestPowerRank from request instead of fetching it
+    const { highestPowerRank } = request;
 
-    if (topPowerRank === null) {
+    // Log request structure for debugging
+    this.logger.log(
+      `Multi-cause request: ${totalCauses} causes, highestPowerRank=${highestPowerRank}`,
+    );
+
+    if (highestPowerRank == null) {
       this.logger.warn(
-        `Top power rank unavailable for multi-cause evaluation - GIVpower scores will be set to 0 for all projects across ${totalCauses} causes`,
+        `Highest power rank unavailable for multi-cause evaluation - GIVpower scores will be set to 0 for all projects across ${totalCauses} causes`,
       );
     } else {
       this.logger.debug(
-        `Using top power rank: ${topPowerRank} for all ${totalCauses} causes in multi-cause evaluation`,
+        `Using highest power rank: ${highestPowerRank} for all ${totalCauses} causes in multi-cause evaluation`,
       );
     }
 
@@ -443,10 +405,10 @@ export class EvaluationService {
         };
 
         try {
-          // Use the shared topPowerRank instead of calling evaluateProjectsWithMetadata
+          // Use the shared highestPowerRank instead of calling evaluateProjectsWithMetadata
           const result = await this.evaluateProjectsWithTopPowerRank(
             causeRequest,
-            topPowerRank,
+            highestPowerRank ?? null,
           );
           causeResult.result = result;
           causeResult.success = true;
@@ -455,7 +417,8 @@ export class EvaluationService {
             `Cause ${causeRequest.cause.id} evaluation completed successfully`,
           );
         } catch (error) {
-          causeResult.error = error.message ?? 'Unknown error occurred';
+          causeResult.error =
+            (error as Error).message || 'Unknown error occurred';
           causeResult.success = false;
 
           this.logger.error(

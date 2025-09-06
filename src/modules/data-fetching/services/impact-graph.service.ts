@@ -10,7 +10,6 @@ import {
   ALL_CAUSES_WITH_PROJECTS_QUERY,
   CAUSE_BY_ID_QUERY,
   ALL_PROJECTS_WITH_FILTERS_QUERY,
-  GET_TOP_POWER_RANK_QUERY,
   BULK_UPDATE_CAUSE_PROJECT_EVALUATION_MUTATION,
 } from '../graphql/queries';
 import {
@@ -635,41 +634,6 @@ export class ImpactGraphService {
       // Re-throw the error to let the calling service handle it
       throw new HttpException(
         'Failed to update cause project evaluations in Impact Graph',
-        HttpStatus.SERVICE_UNAVAILABLE,
-      );
-    }
-  }
-
-  /**
-   * Get the top power rank value for GIVpower scoring normalization
-   * This replaces the need to use totalProjectCount as it provides the actual maximum rank
-   * @returns The top power rank value
-   * @throws HttpException when the query fails
-   */
-  async getTopPowerRank(): Promise<number> {
-    try {
-      this.logger.debug('Fetching top power rank from Impact-Graph');
-
-      const response = await this.graphqlClient.request<{
-        getTopPowerRank: number;
-      }>(GET_TOP_POWER_RANK_QUERY);
-
-      const topPowerRank = response.getTopPowerRank;
-
-      this.logger.debug(`Retrieved top power rank: ${topPowerRank}`);
-
-      return topPowerRank;
-    } catch (error) {
-      this.logger.error(
-        'Failed to fetch top power rank from Impact-Graph',
-        error as GraphQLError,
-      );
-
-      this.handleGraphQLError(error as GraphQLError, 'getTopPowerRank');
-
-      // Throw error instead of providing fallback - let calling service handle appropriately
-      throw new HttpException(
-        'Failed to fetch top power rank from Impact-Graph',
         HttpStatus.SERVICE_UNAVAILABLE,
       );
     }

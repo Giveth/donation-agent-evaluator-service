@@ -474,15 +474,6 @@ export const ALL_PROJECTS_WITH_FILTERS_QUERY = gql`
 `;
 
 /**
- * Query to get the top power rank value for GIVpower scoring normalization
- */
-export const GET_TOP_POWER_RANK_QUERY = gql`
-  query GetTopPowerRank {
-    getTopPowerRank
-  }
-`;
-
-/**
  * Mutation to bulk update cause project evaluation scores
  * Used to send evaluation results back to Impact Graph after evaluation completion
  */

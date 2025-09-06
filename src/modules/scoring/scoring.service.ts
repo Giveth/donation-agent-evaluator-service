@@ -316,6 +316,14 @@ Respond in JSON format:
 
     // Exponential decay: score = 100 * e^(-k * days)
     // k is calculated so that score = 50 at decayDays
+    // Protect against division by zero
+    if (this.updateRecencyDecayDays <= 0) {
+      this.logger.warn(
+        `Invalid updateRecencyDecayDays: ${this.updateRecencyDecayDays}, returning 0`,
+      );
+      return 0;
+    }
+
     const k = Math.log(2) / this.updateRecencyDecayDays;
     const score = 100 * Math.exp(-k * daysSinceUpdate);
 
@@ -339,6 +347,14 @@ Respond in JSON format:
     const daysSincePost = this.getDaysSince(mostRecentPost.createdAt);
 
     // Exponential decay similar to update recency
+    // Protect against division by zero
+    if (this.socialRecencyDecayDays <= 0) {
+      this.logger.warn(
+        `Invalid socialRecencyDecayDays: ${this.socialRecencyDecayDays}, returning 0`,
+      );
+      return 0;
+    }
+
     const k = Math.log(2) / this.socialRecencyDecayDays;
     const score = 100 * Math.exp(-k * daysSincePost);
 
@@ -362,6 +378,14 @@ Respond in JSON format:
     const postCount = recentPosts.length;
 
     // Linear scoring up to the minimum posts threshold
+    // Protect against division by zero
+    if (this.minPostsForFullFrequencyScore <= 0) {
+      this.logger.warn(
+        `Invalid minPostsForFullFrequencyScore: ${this.minPostsForFullFrequencyScore}, returning 0`,
+      );
+      return 0;
+    }
+
     const score = (postCount / this.minPostsForFullFrequencyScore) * 100;
 
     return Math.round(Math.max(0, Math.min(100, score)));
@@ -369,29 +393,31 @@ Respond in JSON format:
 
   /**
    * Calculate GIVpower rank score (0-100)
-   * Lower rank = higher score
-   * Returns 0 when topPowerRank is null (indicating getTopPowerRank query failed)
+   * Lower rank = higher score (rank 0 = 100% score, rank 100 = 0% score)
+   * Returns 0 when highestPowerRank is null/undefined or powerRank is null/undefined
    */
   private calculateGivPowerRankScore(
     givPowerRank?: number,
     topPowerRank?: number | null,
   ): number {
-    // Return 0 if top power rank query failed (indicated by null topPowerRank)
-    if (topPowerRank === null) {
+    // Log input values for debugging
+    this.logger.debug(
+      `GIVpower calculation input: givPowerRank=${givPowerRank}, topPowerRank=${topPowerRank}`,
+    );
+
+    // Return 0 if highest power rank is not available
+    if (topPowerRank === null || topPowerRank === undefined) {
       this.logger.debug(
-        'GIVpower scoring disabled - topPowerRank is null (getTopPowerRank query failed)',
+        'GIVpower scoring disabled - topPowerRank is null or undefined',
       );
       return 0;
     }
 
     // Return 0 if project has no GIVpower rank
-    if (!givPowerRank) {
-      return 0;
-    }
-
-    // Return 0 if topPowerRank is not available (shouldn't happen with new implementation)
-    if (!topPowerRank) {
-      this.logger.warn('GIVpower scoring disabled - topPowerRank is undefined');
+    if (givPowerRank == null) {
+      this.logger.debug(
+        'GIVpower scoring disabled - givPowerRank is null or undefined',
+      );
       return 0;
     }
 
@@ -403,7 +429,7 @@ Respond in JSON format:
       return 0;
     }
 
-    // Safeguard against invalid rank values
+    // Safeguard against invalid negative rank values
     if (givPowerRank < 0) {
       this.logger.warn(
         `Invalid givPowerRank: ${givPowerRank}, treating as unranked`,
@@ -423,8 +449,14 @@ Respond in JSON format:
     // Top 10% get 90-100 score, bottom 10% get 0-10 score
     const percentile = (topPowerRank - givPowerRank) / topPowerRank;
     const score = percentile * 100;
+    const finalScore = Math.round(Math.max(0, Math.min(100, score)));
 
-    return Math.round(Math.max(0, Math.min(100, score)));
+    // Log calculation result for debugging
+    this.logger.debug(
+      `GIVpower calculation: rank ${givPowerRank}/${topPowerRank} -> percentile=${percentile.toFixed(3)} -> score=${finalScore}`,
+    );
+
+    return finalScore;
   }
 
   /**
@@ -482,11 +514,15 @@ Respond in JSON format:
 
   /**
    * Calculate days between a date and now
+   * Returns 0 for future dates to prevent negative values
    */
   private getDaysSince(date: Date): number {
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
-    return Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const daysSince = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    // Return 0 for future dates to prevent negative decay calculations
+    return Math.max(0, daysSince);
   }
 
   /**

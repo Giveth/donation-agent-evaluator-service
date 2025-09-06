@@ -66,8 +66,8 @@ export class ScoringInputDto {
   givPowerRank?: number;
 
   /**
-   * Top (highest/worst) power rank value for rank normalization
-   * When null, GIVpower scoring will be disabled (score = 0)
+   * Highest (worst) power rank value for rank normalization
+   * When null or undefined, GIVpower scoring will be disabled (score = 0)
    */
   @IsOptional()
   @IsNumber()

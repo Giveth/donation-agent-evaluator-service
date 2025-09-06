@@ -40,7 +40,7 @@ describe('ScoringService', () => {
       },
     ],
     givPowerRank: 50,
-    totalProjectCount: 1000,
+    topPowerRank: 1000,
     causeTitle: 'Test Cause',
     causeDescription: 'Test Cause Description',
   });
@@ -303,20 +303,20 @@ describe('ScoringService', () => {
     });
 
     it('should calculate GIVpower rank score correctly', async () => {
-      // NOTE: GIVpower scoring is currently disabled and returns 0 for all projects
-      // due to Impact Graph issues. This test validates the current behavior.
+      // Test GIVpower scoring with percentile-based calculation
+      // Lower rank (better) = higher score
       const testCases = [
-        { rank: 1, totalProjects: 1000, expectedScore: 0 }, // Currently disabled
-        { rank: 100, totalProjects: 1000, expectedScore: 0 }, // Currently disabled
-        { rank: 500, totalProjects: 1000, expectedScore: 0 }, // Currently disabled
-        { rank: 1000, totalProjects: 1000, expectedScore: 0 }, // Currently disabled
+        { rank: 1, totalProjects: 1000, expectedScore: 100 }, // Best rank: (1000-1)/1000 = 99.9% -> 100
+        { rank: 100, totalProjects: 1000, expectedScore: 90 }, // (1000-100)/1000 = 90%
+        { rank: 500, totalProjects: 1000, expectedScore: 50 }, // (1000-500)/1000 = 50%
+        { rank: 1000, totalProjects: 1000, expectedScore: 0 }, // Worst rank: (1000-1000)/1000 = 0%
       ];
 
       for (const { rank, totalProjects, expectedScore } of testCases) {
         const input = new ScoringInputDto({
           ...mockInput,
           givPowerRank: rank,
-          totalProjectCount: totalProjects,
+          topPowerRank: totalProjects,
         });
 
         const mockLLMResponse = {
@@ -347,6 +347,84 @@ describe('ScoringService', () => {
         expect(result.breakdown.givPowerRankScore).toBe(expectedScore);
       }
     });
+
+    it('should handle edge cases and division by zero safely', async () => {
+      const edgeCases = [
+        {
+          rank: 1,
+          topRank: 0,
+          expectedScore: 0,
+          description: 'division by zero',
+        },
+        {
+          rank: 1,
+          topRank: -5,
+          expectedScore: 0,
+          description: 'negative topPowerRank',
+        },
+        {
+          rank: -1,
+          topRank: 48,
+          expectedScore: 0,
+          description: 'negative givPowerRank',
+        },
+        {
+          rank: 50,
+          topRank: 48,
+          expectedScore: 0,
+          description: 'givPowerRank > topPowerRank',
+        },
+        {
+          rank: 0,
+          topRank: 48,
+          expectedScore: 0,
+          description: 'zero givPowerRank',
+        },
+        {
+          rank: 48,
+          topRank: 48,
+          expectedScore: 0,
+          description: 'worst possible rank',
+        },
+      ];
+
+      for (const { rank, topRank, expectedScore } of edgeCases) {
+        const input = new ScoringInputDto({
+          ...mockInput,
+          givPowerRank: rank,
+          topPowerRank: topRank,
+        });
+
+        const mockLLMResponse = {
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  projectInfoQualityScore: 0,
+                  socialMediaQualityScore: 0,
+                  twitterQualityScore: 0,
+                  farcasterQualityScore: 0,
+                  relevanceToCauseScore: 0,
+                  socialMediaRelevanceScore: 0,
+                  projectRelevanceScore: 0,
+                  evidenceOfImpactScore: 0,
+                }),
+              },
+            },
+          ],
+        };
+
+        llmService.createChatCompletion.mockResolvedValue(
+          mockLLMResponse as any,
+        );
+
+        const result = await service.calculateCauseScore(input);
+
+        expect(result.breakdown.givPowerRankScore).toBe(expectedScore);
+        // Test description is just for clarity in case of failures
+        expect(result.breakdown.givPowerRankScore).toBe(expectedScore); // ${description}
+      }
+    });
   });
 
   describe('Weight validation', () => {
@@ -375,7 +453,7 @@ describe('ScoringService', () => {
       const input = new ScoringInputDto({
         ...mockInput,
         givPowerRank: 1,
-        totalProjectCount: 1000,
+        topPowerRank: 1000,
         lastUpdateDate: new Date(),
         socialPosts: Array.from({ length: 10 }, (_, i) => ({
           id: `${i}`,
@@ -387,9 +465,9 @@ describe('ScoringService', () => {
 
       const result = await service.calculateCauseScore(input);
 
-      // With all components at 100 but GIVpower disabled (15%), the final score should be 85
-      // This is expected because GIVpower scoring is currently disabled and returns 0
-      expect(result.finalScore).toBe(85);
+      // With all components at 100 including GIVpower (15%), the final score should be 100
+      // GIVpower scoring is now re-enabled and rank 1/1000 gives perfect score
+      expect(result.finalScore).toBe(100);
     });
   });
 });

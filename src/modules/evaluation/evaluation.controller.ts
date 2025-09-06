@@ -40,7 +40,7 @@ export class EvaluationController {
     @Body() request: EvaluateProjectsRequestDto,
   ): Promise<JobResponseDto> {
     this.logger.log(
-      `Received async evaluation request for cause ${request.cause.id} (${request.cause.title}) with ${request.projectIds.length} projects`,
+      `Received async evaluation request for cause ${request.cause.id} (${request.cause.title}) with ${request.projects.length} projects`,
     );
 
     try {
@@ -75,7 +75,7 @@ export class EvaluationController {
     @Body() request: EvaluateMultipleCausesRequestDto,
   ): Promise<JobResponseDto> {
     const totalProjects = request.causes.reduce(
-      (sum, cause) => sum + cause.projectIds.length,
+      (sum, cause) => sum + cause.projects.length,
       0,
     );
 

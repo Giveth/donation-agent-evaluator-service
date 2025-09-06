@@ -245,7 +245,7 @@ export class DataFetchingService {
       lastUpdateDate: project.lastUpdateDate,
       lastUpdateContent: project.lastUpdateContent,
       socialMediaHandles,
-      givPowerRank: project.givPowerRank,
+      givPowerRank: undefined, // GIVpower data only from request, not local DB
       // Set status based on projectStatus
       status: project.projectStatus
         ? {
@@ -270,14 +270,7 @@ export class DataFetchingService {
       creationDate: undefined,
       updatedAt: undefined,
       latestUpdateCreationDate: project.lastUpdateDate,
-      projectPower: project.givPowerRank
-        ? {
-            projectId: parseInt(project.projectId, 10),
-            powerRank: project.givPowerRank,
-            totalPower: undefined,
-            round: undefined,
-          }
-        : undefined,
+      projectPower: undefined, // GIVpower data only from request, not local DB
       projectInstantPower: undefined,
       projectFuturePower: undefined,
       projectUpdate: project.lastUpdateContent
@@ -325,40 +318,6 @@ export class DataFetchingService {
     } catch (error) {
       this.logger.error('DataFetchingService health check failed:', error);
       return false;
-    }
-  }
-
-  /**
-   * Get the top power rank value for GIVpower scoring normalization
-   * This replaces the need to use totalProjectCount in scoring calculations
-   * @returns The top power rank value from Impact Graph, or null if unavailable
-   */
-  async getTopPowerRank(): Promise<number | null> {
-    try {
-      // Return 100 for staging environment to fix staging-specific issues
-      const isStaging = this.configService.get<boolean>('IS_STAGING', false);
-      if (isStaging) {
-        this.logger.debug(
-          'Staging environment detected - returning fixed top power rank: 100',
-        );
-        return 100;
-      }
-
-      this.logger.debug('Fetching top power rank for scoring normalization');
-      const topPowerRank = await this.impactGraphService.getTopPowerRank();
-      this.logger.debug(
-        `Successfully retrieved top power rank: ${topPowerRank}`,
-      );
-      return topPowerRank;
-    } catch (error) {
-      this.logger.warn(
-        'Failed to fetch top power rank - GIVpower scores will be set to 0 for this evaluation',
-        {
-          error: error instanceof Error ? error.message : String(error),
-        },
-      );
-      // Return null to indicate that GIVpower scoring should be disabled
-      return null;
     }
   }
 }

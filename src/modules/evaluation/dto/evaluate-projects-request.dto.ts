@@ -8,6 +8,20 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
+export class ProjectWithPowerDto {
+  @IsNumber()
+  @IsNotEmpty()
+  id: number;
+
+  @IsOptional()
+  @IsNumber()
+  powerRank?: number;
+
+  @IsOptional()
+  @IsNumber()
+  totalPower?: number;
+}
+
 export class CategoryDto {
   @IsString()
   @IsNotEmpty()
@@ -53,7 +67,8 @@ export class EvaluateProjectsRequestDto {
   cause: CauseDto;
 
   @IsArray()
-  @IsNumber({}, { each: true })
+  @ValidateNested({ each: true })
+  @Type(() => ProjectWithPowerDto)
   @IsNotEmpty()
-  projectIds: number[];
+  projects: ProjectWithPowerDto[];
 }

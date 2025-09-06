@@ -44,12 +44,12 @@ export class EvaluationService {
    * instead of direct API calls to Twitter/Farcaster services.
    *
    * @param cause - The cause details
-   * @param projectIds - Array of project IDs to evaluate
+   * @param projects - Array of project objects with power data
    * @returns Promise<ScoredProjectDto[]> - Sorted list of scored projects
    */
   async evaluateProjects(
     cause: CauseDto,
-    projectsWithPower: {
+    projects: {
       id: number;
       powerRank?: number;
       totalPower?: number;
@@ -58,11 +58,11 @@ export class EvaluationService {
   ): Promise<ScoredProjectDto[]> {
     const startTime = Date.now();
     this.logger.log(
-      `Starting evaluation for cause ${cause.id} with ${projectsWithPower.length} projects`,
+      `Starting evaluation for cause ${cause.id} with ${projects.length} projects`,
     );
 
     // Log project power data structure for debugging
-    const powerDataSummary = projectsWithPower.map(p => ({
+    const powerDataSummary = projects.map(p => ({
       id: p.id,
       powerRank: p.powerRank,
       totalPower: p.totalPower,
@@ -86,24 +86,24 @@ export class EvaluationService {
       }
 
       // Extract project IDs for fetching project details
-      const projectIds = projectsWithPower.map(p => p.id);
+      const projectIds = projects.map(p => p.id);
 
       // Fetch project details from local database first, fallback to GraphQL
-      const projects =
+      const projectDetails =
         await this.dataFetchingService.getProjectsByIds(projectIds);
 
       this.logger.debug(
-        `Processing ${projects.length} projects with concurrency limit of 3`,
+        `Processing ${projectDetails.length} projects with concurrency limit of 3`,
       );
 
       // Process projects in parallel with controlled concurrency
-      const evaluationPromises = projects.map(project => {
+      const evaluationPromises = projectDetails.map(project => {
         // Find the power data for this project
-        const powerData = projectsWithPower.find(p => p.id === project.id);
+        const powerData = projects.find(p => p.id === project.id);
 
         // Log Givpower data for debugging staging issues
         this.logger.debug(
-          `Project ${project.id}: powerRank from request=${powerData?.powerRank}, project.givPowerRank=${project.givPowerRank}, using powerRank=${powerData?.powerRank}`,
+          `Project ${project.id}: powerRank from request=${powerData?.powerRank}, project.projectPower.powerRank=${project.projectPower?.powerRank}, using powerRank=${powerData?.powerRank}`,
         );
 
         return this.projectConcurrencyLimit(async () => {
@@ -270,12 +270,12 @@ export class EvaluationService {
 
     // Log single cause evaluation request for debugging
     this.logger.log(
-      `Single cause evaluation: cause=${request.cause.id}, ${request.projectIds.length} projects, highestPowerRank=${highestPowerRank}`,
+      `Single cause evaluation: cause=${request.cause.id}, ${request.projects.length} projects, highestPowerRank=${highestPowerRank}`,
     );
 
     const scoredProjects = await this.evaluateProjects(
       request.cause,
-      request.projectIds,
+      request.projects,
       highestPowerRank,
     );
 
@@ -325,7 +325,7 @@ export class EvaluationService {
 
     const scoredProjects = await this.evaluateProjects(
       request.cause,
-      request.projectIds,
+      request.projects,
       highestPowerRank ?? undefined,
     );
 

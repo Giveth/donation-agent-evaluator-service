@@ -180,7 +180,7 @@ export class EvaluationWorkerService implements OnModuleInit {
     }
 
     this.logger.log(
-      `Processing single cause evaluation for cause ${requestData.cause.id} with ${requestData.projectIds.length} projects`,
+      `Processing single cause evaluation for cause ${requestData.cause.id} with ${requestData.projects.length} projects`,
     );
 
     // Use the existing evaluation service method - this preserves all pLimit concurrency control

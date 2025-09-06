@@ -70,5 +70,5 @@ export class EvaluateProjectsRequestDto {
   @ValidateNested({ each: true })
   @Type(() => ProjectWithPowerDto)
   @IsNotEmpty()
-  projectIds: ProjectWithPowerDto[];
+  projects: ProjectWithPowerDto[];
 }

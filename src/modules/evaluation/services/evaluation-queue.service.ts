@@ -31,7 +31,7 @@ export class EvaluationQueueService {
     request: EvaluateProjectsRequestDto,
   ): Promise<JobResponseDto> {
     this.logger.log(
-      `Queueing single cause evaluation for cause ${request.cause.id} with ${request.projectIds.length} projects`,
+      `Queueing single cause evaluation for cause ${request.cause.id} with ${request.projects.length} projects`,
     );
 
     const job = this.scheduledJobRepository.create({
@@ -44,7 +44,7 @@ export class EvaluationQueueService {
         requestType: 'single_cause',
         causeId: request.cause.id,
         causeName: request.cause.title,
-        projectCount: request.projectIds.length,
+        projectCount: request.projects.length,
         queuedAt: new Date().toISOString(),
         requestData: request,
       },
@@ -53,8 +53,8 @@ export class EvaluationQueueService {
     const savedJob = await this.scheduledJobRepository.save(job);
 
     // Calculate estimated duration (30-45 seconds per project)
-    const minSeconds = request.projectIds.length * 30;
-    const maxSeconds = request.projectIds.length * 45;
+    const minSeconds = request.projects.length * 30;
+    const maxSeconds = request.projects.length * 45;
     const estimatedDuration = `${minSeconds}s - ${maxSeconds}s`;
 
     this.logger.log(
@@ -77,7 +77,7 @@ export class EvaluationQueueService {
     request: EvaluateMultipleCausesRequestDto,
   ): Promise<JobResponseDto> {
     const totalProjects = request.causes.reduce(
-      (sum, cause) => sum + cause.projectIds.length,
+      (sum, cause) => sum + cause.projects.length,
       0,
     );
 

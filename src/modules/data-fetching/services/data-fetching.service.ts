@@ -245,7 +245,7 @@ export class DataFetchingService {
       lastUpdateDate: project.lastUpdateDate,
       lastUpdateContent: project.lastUpdateContent,
       socialMediaHandles,
-      givPowerRank: project.givPowerRank,
+      givPowerRank: undefined, // GIVpower data only from request, not local DB
       // Set status based on projectStatus
       status: project.projectStatus
         ? {
@@ -270,14 +270,7 @@ export class DataFetchingService {
       creationDate: undefined,
       updatedAt: undefined,
       latestUpdateCreationDate: project.lastUpdateDate,
-      projectPower: project.givPowerRank
-        ? {
-            projectId: parseInt(project.projectId, 10),
-            powerRank: project.givPowerRank,
-            totalPower: undefined,
-            round: undefined,
-          }
-        : undefined,
+      projectPower: undefined, // GIVpower data only from request, not local DB
       projectInstantPower: undefined,
       projectFuturePower: undefined,
       projectUpdate: project.lastUpdateContent

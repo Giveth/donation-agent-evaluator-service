@@ -103,7 +103,7 @@ export class EvaluationService {
 
         // Log Givpower data for debugging staging issues
         this.logger.debug(
-          `Project ${project.id}: powerRank from request=${powerData?.powerRank}, project.projectPower.powerRank=${project.projectPower?.powerRank}, using powerRank=${powerData?.powerRank}`,
+          `Project ${project.id}: using powerRank=${powerData?.powerRank} from request (local DB GIVpower data ignored)`,
         );
 
         return this.projectConcurrencyLimit(async () => {

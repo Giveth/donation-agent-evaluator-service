@@ -6,14 +6,22 @@ The Scoring Module is responsible for calculating comprehensive cause scores for
 
 The scoring system evaluates projects using the following weighted components (total: 100%):
 
-- **Project Information & Update Quality**: 20% (LLM-assessed)
-- **Update Recency**: 10% (calculated)
-- **Social Media Content Quality**: 20% (LLM-assessed)
-- **Social Media Posting Recency**: 5% (calculated)
-- **Social Media Posting Frequency**: 5% (calculated)
-- **Relevance to Cause**: 20% (LLM-assessed)
-- **Existing Quality Score**: 10% (from Giveth DB)
-- **GIVpower Rank**: 10% (from Giveth DB)
+- **10% Project Information and Update Quality of Content**
+- **25% evidence of social/environmental impact or philanthropic action done inside of:**
+  - Project updates
+  - Twitter posts
+  - Farcaster posts
+- **5% How recent the project was edited and time since their last update**
+- **10% Social Media Post Content Quality, weighted evenly**
+  - Twitter quality - 50%
+  - Farcaster quality - 50%
+- **5% How recent the project has posted to social media**
+- **5% Frequency of posts to social media**
+- **25% Relevance of Information, Update and Social Media Content to Cause**
+  - Twitter relevance - 33%
+  - Farcaster relevance - 33%
+  - Project data relevance - 33%
+- **15% GIVpower Rank**
 
 ## Components
 
